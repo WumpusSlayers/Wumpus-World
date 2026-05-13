@@ -36,7 +36,7 @@ public class Grid {
     }
 
     //에이전트가 벽에 부딪혔는지 확인
-    private boolean isValid(Position pos) {
+    public boolean isValid(Position pos) {
         return pos.getX() >= 1 && pos.getX() <= SIZE  &&
                 pos.getY() >= 1 && pos.getY() <= SIZE;
     }
