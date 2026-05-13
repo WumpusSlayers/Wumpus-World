@@ -42,4 +42,31 @@ public class World {
             this.arrowCount--;
         }
     }
+    /*
+     * 현재 월드의 상태를 텍스트로 시각화
+     * [W]: Wumpus, [P]: Pit, [G]: Gold, [A]: Agent
+     */
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n----- Wumpus World Map -----\n");
+        for (int y = 4; y >= 1; y--) { // 좌표계 특성상 위에서 아래로 출력
+            for (int x = 1; x <= 4; x++) {
+                Position pos = new Position(x, y);
+                Cell cell = grid.getCell(pos);
+
+                sb.append("[");
+                if (agentPosition.equals(pos)) sb.append("A");
+                else if (cell.isHasWumpus()) sb.append("W");
+                else if (cell.isHasPit()) sb.append("P");
+                else if (cell.isHasGold()) sb.append("G");
+                else sb.append(" ");
+                sb.append("] ");
+            }
+            sb.append("\n");
+        }
+        sb.append("Agent: ").append(agentDirection).append(" | Status: ").append(status);
+        sb.append("\n----------------------------");
+        return sb.toString();
+    }
 }

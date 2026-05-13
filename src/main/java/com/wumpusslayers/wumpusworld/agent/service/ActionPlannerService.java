@@ -90,12 +90,31 @@ public class ActionPlannerService {
         return true; //벽에 부딪힘
     }
 
+    //생존 여부 판단
     private void checkSurvival(World world) {
         Cell currentCell = world.getGrid().getCell(world.getAgentPosition());
+
+        // 구덩이에 빠진 경우
         if (currentCell.isHasPit()) {
-            world.setStatus(GameStatus.LOSE_PIT);
-        } else if (currentCell.isHasWumpus()) {
-            world.setStatus(GameStatus.LOSE_WUMPUS);
+            System.out.println("⚠️ [EVENT] 구덩이에 빠졌습니다! (1,1)에서 다시 시작합니다.");
+            resetAgent(world, GameStatus.PLAYING);
         }
+        // 웜파스에게 잡힌 경우
+        else if (currentCell.isHasWumpus()) {
+            System.out.println("⚠️ [EVENT] 웜파스에게 잡아먹혔습니다! (1,1)에서 다시 시작합니다.");
+            resetAgent(world, GameStatus.PLAYING);
+        }
+    }
+
+    /*
+     * 에이전트의 위치와 상태를 초기화
+     */
+    private void resetAgent(World world, GameStatus nextStatus) {
+        world.setAgentPosition(new Position(1, 1)); // 시작 위치로 이동
+        world.setAgentDirection(Direction.EAST);    // 기본 방향(동쪽) 설정
+        world.setStatus(nextStatus);                // 게임 상태 유지/변경
+
+        // (1,1)은 항상 방문한 것으로 처리
+        world.getGrid().getCell(new Position(1, 1)).setVisited(true);
     }
 }
