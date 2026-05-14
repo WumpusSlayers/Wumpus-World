@@ -22,10 +22,12 @@ public enum InferenceRule {
 
     private final int defaultPriority;
 
+    /** 규칙별 기본 우선순위(낮을수록 먼저 적용하는 식으로 #13에서 사용 가능). */
     InferenceRule(int defaultPriority) {
         this.defaultPriority = defaultPriority;
     }
 
+    /** 기본 우선순위 값을 반환한다. */
     public int defaultPriority() {
         return defaultPriority;
     }

@@ -24,6 +24,7 @@ public final class KnowledgeBase {
     private boolean wumpusAlive;
     private boolean heardScream;
 
+    /** 4×4 격자 지식을 초기 상태(시작칸 안전 등)로 만든다. */
     public KnowledgeBase() {
         this.cells = new CellBelief[GRID_SIZE][GRID_SIZE];
         this.safe = new boolean[GRID_SIZE][GRID_SIZE];
@@ -58,10 +59,12 @@ public final class KnowledgeBase {
         initializeState();
     }
 
+    /** 움퍼스가 살아 있는지 여부(Scream 관측 시 false로 바뀔 수 있다). */
     public boolean isWumpusAlive() {
         return wumpusAlive;
     }
 
+    /** Scream을 들었는지 여부. */
     public boolean isHeardScream() {
         return heardScream;
     }
@@ -77,6 +80,7 @@ public final class KnowledgeBase {
         possibleWumpus[xi][yi] = false;
     }
 
+    /** 해당 칸에 pit이 있을 수 있는지 설정한다. 안전 칸에 true면 예외. */
     public void setPossiblePit(Position pos, boolean value) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
@@ -86,6 +90,7 @@ public final class KnowledgeBase {
         }
     }
 
+    /** 해당 칸에 움퍼스가 있을 수 있는지 설정한다. 안전 칸에 true면 예외. */
     public void setPossibleWumpus(Position pos, boolean value) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
@@ -95,10 +100,12 @@ public final class KnowledgeBase {
         }
     }
 
+    /** 움퍼스 생존 플래그를 직접 설정한다(#13 등에서 규칙 반영 후 갱신). */
     public void setWumpusAlive(boolean wumpusAlive) {
         this.wumpusAlive = wumpusAlive;
     }
 
+    /** Scream 들음 여부를 직접 설정한다. */
     public void setHeardScream(boolean heardScream) {
         this.heardScream = heardScream;
     }
@@ -117,36 +124,42 @@ public final class KnowledgeBase {
         }
     }
 
+    /** 격자 안의 좌표(1~4)인지 여부. null이면 false. */
     public boolean isValid(Position pos) {
         return pos != null
                 && pos.getX() >= 1 && pos.getX() <= GRID_SIZE
                 && pos.getY() >= 1 && pos.getY() <= GRID_SIZE;
     }
 
+    /** 해당 칸을 방문해 관측이 기록되었는지. */
     public boolean isVisited(Position pos) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
         return cells[xi][yi].visited();
     }
 
+    /** 해당 칸의 믿음(방문·마지막 지각)을 반환한다. */
     public CellBelief getCellBelief(Position pos) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
         return cells[xi][yi];
     }
 
+    /** 추론상 안전으로 확정된 칸인지. */
     public boolean isSafe(Position pos) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
         return safe[xi][yi];
     }
 
+    /** 해당 칸에 pit이 있을 수 있다고 보는지. */
     public boolean isPossiblePit(Position pos) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
         return possiblePit[xi][yi];
     }
 
+    /** 해당 칸에 움퍼스가 있을 수 있다고 보는지. */
     public boolean isPossibleWumpus(Position pos) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
@@ -160,10 +173,12 @@ public final class KnowledgeBase {
         return copyGrid(safe);
     }
 
+    /** pit 후보 그리드의 복사본을 반환한다. */
     public boolean[][] copyPossiblePitGrid() {
         return copyGrid(possiblePit);
     }
 
+    /** 움퍼스 후보 그리드의 복사본을 반환한다. */
     public boolean[][] copyPossibleWumpusGrid() {
         return copyGrid(possibleWumpus);
     }
