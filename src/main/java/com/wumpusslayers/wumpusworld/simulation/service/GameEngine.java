@@ -16,6 +16,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 게임 월드와 추론 KB는 동일한 {@code userId} 키로 묶인다(#15).
+ * {@link #startNewGame(String)} 에서만 KB를 비우고, 사망 후 {@code (1,1)} 복귀 시에는 KB를 건드리지 않는다.
+ */
 @Service
 @RequiredArgsConstructor
 public class GameEngine {
@@ -29,7 +33,8 @@ public class GameEngine {
     private final ConcurrentHashMap<String, World> gameSessions = new ConcurrentHashMap<>();
 
     /**
-     * 새 World를 만들고 세션을 등록한 뒤, KB를 초기화하고 시작 칸 percept로 추론까지 반영한다(#14).
+     * 새 World를 만들고 세션을 등록한 뒤, KB를 초기화하고 시작 칸 percept로 추론까지 반영한다(#14·#15).
+     * 완전히 새 게임일 때만 추론 세션을 비운다. 사망 리스폰은 {@link #processAction(String, ActionType)} 경로에서 처리한다.
      */
     public World startNewGame(String userId) {
         requireUserId(userId);
@@ -46,7 +51,8 @@ public class GameEngine {
     }
 
     /**
-     * 액션 실행 후 현재 칸 percept로 KB를 갱신하고 추론을 돌린다(#14).
+     * 액션 실행 후 현재 칸 percept로 KB를 갱신하고 추론을 돌린다(#14·#15).
+     * {@link ActionPlannerService} 가 구덩이·움퍼스로 에이전트를 (1,1)로 되돌려도 KB는 유지된다(#15).
      */
     public Action processAction(String userId, ActionType actionType) {
         requireUserId(userId);

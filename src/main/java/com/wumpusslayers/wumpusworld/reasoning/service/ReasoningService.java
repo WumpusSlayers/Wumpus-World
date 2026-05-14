@@ -48,9 +48,7 @@ public class ReasoningService {
      * 사망 후 (1,1) 복귀에서는 호출하지 않는다(#15).
      */
     public void resetKnowledgeForNewGame(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
-            return;
-        }
+        requireSessionId(sessionId);
         knowledgeUpdateService.resetSession(sessionId);
     }
 
