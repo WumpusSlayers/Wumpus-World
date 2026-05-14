@@ -1,4 +1,264 @@
 package com.wumpusslayers.wumpusworld.reasoning.service;
 
+import com.wumpusslayers.wumpusworld.common.exception.SimulationException;
+import com.wumpusslayers.wumpusworld.environment.domain.Position;
+import com.wumpusslayers.wumpusworld.reasoning.domain.InferenceRule;
+import com.wumpusslayers.wumpusworld.reasoning.domain.KnowledgeBase;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * {@link KnowledgeBase}에 저장된 관측만으로 Pit·Wumpus 후보를 줄이는 전진 추론(#13).
+ * 환경의 숨겨진 진실({@code World}/{@code Grid})은 읽지 않는다.
+ */
+@Service
 public class RuleEngineService {
+
+    private static final int MAX_ROUNDS = 64;
+
+    private final Logger log = LoggerFactory.getLogger(RuleEngineService.class);
+
+    /**
+     * KB가 더 이상 바뀌지 않을 때까지 규칙을 반복 적용한다. 상한에 도달하면 경고 로그 후 중단한다.
+     */
+    public void runInference(KnowledgeBase kb) {
+        if (kb == null) {
+            throw new SimulationException("KnowledgeBase must not be null");
+        }
+        int round = 0;
+        boolean changed;
+        do {
+            changed = applyOneRound(kb);
+            round++;
+            if (changed && log.isDebugEnabled()) {
+                log.debug("reasoning round {} applied changes", round);
+            }
+        } while (changed && round < MAX_ROUNDS);
+
+        if (changed) {
+            log.warn("Rule engine stopped after {} rounds while KB was still changing", MAX_ROUNDS);
+        }
+    }
+
+    /** 한 라운드: 방문·Scream·바람·악취 규칙과 후보 소진 시 안전 확정을 순서대로 적용한다. */
+    private boolean applyOneRound(KnowledgeBase kb) {
+        Map<InferenceRule, Boolean> fired = log.isDebugEnabled() ? new EnumMap<>(InferenceRule.class) : null;
+
+        boolean changed = false;
+        changed |= applyVisitedCellsAreSafe(kb);
+        changed |= applyRule(kb, InferenceRule.SCREAM_WUMPUS_ELIMINATED, fired, this::applyScreamEliminatesWumpusCandidates);
+        changed |= applyRule(kb, InferenceRule.NO_BREEZE_CLEAR_ADJACENT_PIT_CANDIDATES, fired, this::applyNoBreezeClearsAdjacentPit);
+        changed |= applyRule(kb, InferenceRule.NO_STENCH_CLEAR_ADJACENT_WUMPUS_CANDIDATES, fired, this::applyNoStenchClearsAdjacentWumpus);
+        changed |= applyRule(kb, InferenceRule.BREEZE_MARK_PIT_CANDIDATES, fired, this::applyBreezeMarksAdjacentPitCandidates);
+        changed |= applyRule(kb, InferenceRule.STENCH_MARK_WUMPUS_CANDIDATES, fired, this::applyStenchMarksAdjacentWumpusCandidates);
+        changed |= applyCandidateFreeCellsAsSafe(kb);
+
+        if (fired != null && !fired.isEmpty()) {
+            log.debug("rules touched this sub-pass: {}", fired);
+        }
+        return changed;
+    }
+
+    /** {@link #applyRule}에서 한 번 호출할 규칙 적용 블록. */
+    @FunctionalInterface
+    private interface RuleApplier {
+        boolean apply(KnowledgeBase kb);
+    }
+
+    /** 단일 규칙을 적용하고, debug 시 어떤 규칙이 바꿨는지 기록한다. */
+    private boolean applyRule(
+            KnowledgeBase kb,
+            InferenceRule rule,
+            Map<InferenceRule, Boolean> fired,
+            RuleApplier applier
+    ) {
+        boolean delta = applier.apply(kb);
+        if (delta && fired != null) {
+            fired.put(rule, true);
+        }
+        return delta;
+    }
+
+    /** 방문한 칸은 생존했으므로 pit·wumpus가 없다고 본다. */
+    private boolean applyVisitedCellsAreSafe(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (!kb.isVisited(p)) {
+                    continue;
+                }
+                if (!kb.isSafe(p) || kb.isPossiblePit(p) || kb.isPossibleWumpus(p)) {
+                    kb.markDefinitelySafe(p);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** Scream 또는 움퍼스 사망 확정 시, 전 격자에서 움퍼스 후보를 제거한다(움퍼스 1마리 가정). */
+    private boolean applyScreamEliminatesWumpusCandidates(KnowledgeBase kb) {
+        if (kb.isWumpusAlive() && !kb.isHeardScream()) {
+            return false;
+        }
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (kb.isPossibleWumpus(p)) {
+                    kb.setPossibleWumpus(p, false);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** 바람이 없는 관측 칸: 인접 칸의 pit 후보를 제거한다. */
+    private boolean applyNoBreezeClearsAdjacentPit(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (!kb.isVisited(p) || kb.getCellBelief(p).lastPercept().isBreeze()) {
+                    continue;
+                }
+                for (Position n : neighbors(p)) {
+                    if (!kb.isValid(n)) {
+                        continue;
+                    }
+                    if (kb.isPossiblePit(n)) {
+                        kb.setPossiblePit(n, false);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** 악취가 없는 관측 칸: 인접 칸의 wumpus 후보를 제거한다. */
+    private boolean applyNoStenchClearsAdjacentWumpus(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (!kb.isVisited(p) || kb.getCellBelief(p).lastPercept().isStench()) {
+                    continue;
+                }
+                for (Position n : neighbors(p)) {
+                    if (!kb.isValid(n)) {
+                        continue;
+                    }
+                    if (kb.isPossibleWumpus(n)) {
+                        kb.setPossibleWumpus(n, false);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** 바람이 있는 관측 칸: 아직 안전이 아닌 인접 칸에 pit 후보를 표시한다. */
+    private boolean applyBreezeMarksAdjacentPitCandidates(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (!kb.isVisited(p) || !kb.getCellBelief(p).lastPercept().isBreeze()) {
+                    continue;
+                }
+                for (Position n : neighbors(p)) {
+                    if (!kb.isValid(n) || kb.isSafe(n)) {
+                        continue;
+                    }
+                    if (!kb.isPossiblePit(n)) {
+                        kb.setPossiblePit(n, true);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** 악취가 있고 움퍼스가 살아 있으면: 안전이 아닌 인접 칸에 wumpus 후보를 표시한다. */
+    private boolean applyStenchMarksAdjacentWumpusCandidates(KnowledgeBase kb) {
+        if (!kb.isWumpusAlive()) {
+            return false;
+        }
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (!kb.isVisited(p) || !kb.getCellBelief(p).lastPercept().isStench()) {
+                    continue;
+                }
+                for (Position n : neighbors(p)) {
+                    if (!kb.isValid(n) || kb.isSafe(n)) {
+                        continue;
+                    }
+                    if (!kb.isPossibleWumpus(n)) {
+                        kb.setPossibleWumpus(n, true);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** pit·wumpus 후보가 모두 없으면 해당 칸을 안전으로 확정한다. */
+    private boolean applyCandidateFreeCellsAsSafe(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (!kb.isValid(p) || kb.isSafe(p)) {
+                    continue;
+                }
+                if (!kb.isPossiblePit(p) && !kb.isPossibleWumpus(p)) {
+                    kb.markDefinitelySafe(p);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** 4×4 격자에서 상하좌우 인접 좌표만 반환한다. */
+    static List<Position> neighbors(Position p) {
+        List<Position> out = new ArrayList<>(4);
+        int x = p.getX();
+        int y = p.getY();
+        if (x > 1) {
+            out.add(new Position(x - 1, y));
+        }
+        if (x < KnowledgeBase.GRID_SIZE) {
+            out.add(new Position(x + 1, y));
+        }
+        if (y > 1) {
+            out.add(new Position(x, y - 1));
+        }
+        if (y < KnowledgeBase.GRID_SIZE) {
+            out.add(new Position(x, y + 1));
+        }
+        return out;
+    }
+
+    /** 우선순위 순으로 규칙 식별자를 나열한다(테스트·문서용). */
+    static List<InferenceRule> rulesInDefaultOrder() {
+        return java.util.Arrays.stream(InferenceRule.values())
+                .sorted(Comparator.comparingInt(InferenceRule::defaultPriority))
+                .toList();
+    }
 }

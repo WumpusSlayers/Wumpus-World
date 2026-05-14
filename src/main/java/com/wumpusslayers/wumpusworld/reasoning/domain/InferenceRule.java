@@ -1,7 +1,8 @@
 package com.wumpusslayers.wumpusworld.reasoning.domain;
 
 /**
- * 전진 추론에 사용할 규칙 식별자(뼈대). 실제 적용 로직은 {@code RuleEngineService}(#13)에서 구현한다.
+ * 전진 추론에 사용할 규칙 식별자. 적용 순서는 {@link #defaultPriority()} 오름차순을 권장하며,
+ * 실제 루프·종료 조건은 {@link com.wumpusslayers.wumpusworld.reasoning.service.RuleEngineService}를 본다(#13).
  */
 public enum InferenceRule {
 
