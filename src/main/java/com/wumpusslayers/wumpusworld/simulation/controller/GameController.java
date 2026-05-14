@@ -4,9 +4,11 @@ package com.wumpusslayers.wumpusworld.simulation.controller;
  * 프론트엔드와 통신하여 게임 데이터를 주고받는 컨트롤러입니다.
  */
 import com.wumpusslayers.wumpusworld.agent.domain.Action;
-import com.wumpusslayers.wumpusworld.simulation.service.GameEngine;
 import com.wumpusslayers.wumpusworld.common.enums.ActionType;
 import com.wumpusslayers.wumpusworld.environment.domain.World;
+import com.wumpusslayers.wumpusworld.reasoning.dto.response.KnowledgeSummaryResponse;
+import com.wumpusslayers.wumpusworld.reasoning.service.ReasoningService;
+import com.wumpusslayers.wumpusworld.simulation.service.GameEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class GameController {
 
     private final GameEngine gameEngine;
+    private final ReasoningService reasoningService;
 
     /*
      * 새로운 게임 생성 API
@@ -42,5 +45,13 @@ public class GameController {
     @GetMapping("/status")
     public World getStatus(@RequestParam String userId) {
         return gameEngine.getGameStatus(userId);
+    }
+
+    /*
+     * 세션별 KB 요약(안전·방문 칸, 움퍼스 플래그) — 플래닝·Postman 디버그용(#14)
+     */
+    @GetMapping("/reasoning/summary")
+    public KnowledgeSummaryResponse getReasoningSummary(@RequestParam String userId) {
+        return reasoningService.getKnowledgeSummary(userId);
     }
 }
