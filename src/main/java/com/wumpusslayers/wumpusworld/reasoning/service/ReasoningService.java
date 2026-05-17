@@ -33,6 +33,20 @@ public class ReasoningService {
     }
 
     /**
+     * 시뮬이 알려 준 “격자에 살아 있는 움퍼스가 하나라도 있는지”를 KB {@code wumpusAlive}에 반영하고 추론을 한 번 돌린다.
+     * 호출 측(예: {@link com.wumpusslayers.wumpusworld.simulation.service.GameEngine})이 {@code World} 등에서 값을 계산해 넘긴다(#15·다중 움퍼스).
+     */
+    public void syncWumpusAlive(String sessionId, boolean anyLiveWumpusOnGrid) {
+        requireSessionId(sessionId);
+        KnowledgeBase kb = knowledgeUpdateService.getKnowledgeBaseOrNull(sessionId);
+        if (kb == null) {
+            return;
+        }
+        kb.setWumpusAlive(anyLiveWumpusOnGrid);
+        ruleEngineService.runInference(kb);
+    }
+
+    /**
      * 현재 KB에 대해 규칙 엔진만 다시 적용한다. KB가 없으면 아무 것도 하지 않는다.
      */
     public void runInference(String sessionId) {

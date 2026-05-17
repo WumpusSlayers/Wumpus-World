@@ -38,6 +38,17 @@ class ReasoningServiceTest {
     }
 
     @Test
+    @DisplayName("syncWumpusAlive(false)는 KB wumpusAlive를 false로 맞춘다.")
+    void syncWumpusAliveReflectsSimulationFlag() {
+        reasoningService.updateFromObservation("u1", new Position(1, 1), p(false, false));
+        assertTrue(reasoningService.getKnowledgeSummary("u1").wumpusAlive());
+
+        reasoningService.syncWumpusAlive("u1", false);
+
+        assertFalse(reasoningService.getKnowledgeSummary("u1").wumpusAlive());
+    }
+
+    @Test
     @DisplayName("resetKnowledgeForNewGame 후에는 요약이 비어 있다.")
     void resetClearsSession() {
         reasoningService.updateFromObservation("u1", new Position(1, 1), p(false, false));

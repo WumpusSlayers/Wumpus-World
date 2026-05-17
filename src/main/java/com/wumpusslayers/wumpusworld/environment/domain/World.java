@@ -42,6 +42,18 @@ public class World {
             this.arrowCount--;
         }
     }
+
+    /** 격자에 {@code hasWumpus}인 칸이 하나라도 있으면 true (다중 움퍼스·SHOOT 제거 후 그리드가 진실). */
+    public boolean hasAnyWumpusOnGrid() {
+        for (int x = 1; x <= Grid.getSIZE(); x++) {
+            for (int y = 1; y <= Grid.getSIZE(); y++) {
+                if (grid.getCell(new Position(x, y)).isHasWumpus()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     /*
      * 현재 월드의 상태를 텍스트로 시각화
      * [W]: Wumpus, [P]: Pit, [G]: Gold, [A]: Agent

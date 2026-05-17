@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * {@link KnowledgeBase}에 저장된 관측만으로 Pit·Wumpus 후보를 줄이는 전진 추론(#13).
+ * {@link KnowledgeBase}에 저장된 관측만으로 Pit·Wumpus 후보를 줄이는 전진 추론(#13·#19).
  * 환경의 숨겨진 진실({@code World}/{@code Grid})은 읽지 않는다.
  */
 @Service
@@ -47,7 +47,7 @@ public class RuleEngineService {
         }
     }
 
-    /** 한 라운드: 방문·Scream·바람·악취 규칙과 후보 소진 시 안전 확정을 순서대로 적용한다. */
+    /** 한 라운드: 방문·전멸 시 움퍼스 후보 제거·바람·악취 규칙, breeze/pit·stench/wumpus 단일 후보 축소, 후보 소진 시 안전 확정(#13·#19). */
     private boolean applyOneRound(KnowledgeBase kb) {
         Map<InferenceRule, Boolean> fired = log.isDebugEnabled() ? new EnumMap<>(InferenceRule.class) : null;
 
@@ -57,7 +57,9 @@ public class RuleEngineService {
         changed |= applyRule(kb, InferenceRule.NO_BREEZE_CLEAR_ADJACENT_PIT_CANDIDATES, fired, this::applyNoBreezeClearsAdjacentPit);
         changed |= applyRule(kb, InferenceRule.NO_STENCH_CLEAR_ADJACENT_WUMPUS_CANDIDATES, fired, this::applyNoStenchClearsAdjacentWumpus);
         changed |= applyRule(kb, InferenceRule.BREEZE_MARK_PIT_CANDIDATES, fired, this::applyBreezeMarksAdjacentPitCandidates);
+        changed |= applyRule(kb, InferenceRule.BREEZE_PIT_SINGLETON_NARROWS_NEIGHBORS, fired, this::applyBreezePitSingletonNarrowsNeighbors);
         changed |= applyRule(kb, InferenceRule.STENCH_MARK_WUMPUS_CANDIDATES, fired, this::applyStenchMarksAdjacentWumpusCandidates);
+        changed |= applyRule(kb, InferenceRule.STENCH_WUMPUS_SINGLETON_NARROWS_NEIGHBORS, fired, this::applyStenchWumpusSingletonNarrowsNeighbors);
         changed |= applyCandidateFreeCellsAsSafe(kb);
 
         if (fired != null && !fired.isEmpty()) {
@@ -104,9 +106,13 @@ public class RuleEngineService {
         return changed;
     }
 
-    /** Scream 또는 움퍼스 사망 확정 시, 전 격자에서 움퍼스 후보를 제거한다(움퍼스 1마리 가정). */
+    /**
+     * KB에서 살아 있는 움퍼스가 없다고 판정되면({@link KnowledgeBase#isWumpusAlive()} false) 전 격자에서 움퍼스 후보를 제거한다.
+     * 비명(percept)만으로는 생존 플래그를 끄지 않으므로, 다중 움퍼스에서는 시뮬 등이 플래그를 맞춘 뒤 이 규칙이 동작한다.
+     * {@link InferenceRule#SCREAM_WUMPUS_ELIMINATED} 식별자와 연결되나, 메서드명은 이력적 표기다.
+     */
     private boolean applyScreamEliminatesWumpusCandidates(KnowledgeBase kb) {
-        if (kb.isWumpusAlive() && !kb.isHeardScream()) {
+        if (kb.isWumpusAlive()) {
             return false;
         }
         boolean changed = false;
@@ -209,6 +215,87 @@ public class RuleEngineService {
                     }
                     if (!kb.isPossibleWumpus(n)) {
                         kb.setPossibleWumpus(n, true);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Breeze가 난 방문 칸마다, 인접 중 “안전이 아니면서 pit 후보”인 칸이 하나뿐이면
+     * 같은 인접의 나머지 칸은 pit 후보에서 제외한다(#19).
+     */
+    private boolean applyBreezePitSingletonNarrowsNeighbors(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position b = new Position(x, y);
+                if (!kb.isVisited(b) || !kb.getCellBelief(b).lastPercept().isBreeze()) {
+                    continue;
+                }
+                List<Position> pitCandidates = new ArrayList<>();
+                for (Position n : neighbors(b)) {
+                    if (!kb.isValid(n) || kb.isSafe(n)) {
+                        continue;
+                    }
+                    if (kb.isPossiblePit(n)) {
+                        pitCandidates.add(n);
+                    }
+                }
+                if (pitCandidates.size() != 1) {
+                    continue;
+                }
+                Position only = pitCandidates.get(0);
+                for (Position m : neighbors(b)) {
+                    if (!kb.isValid(m) || m.equals(only)) {
+                        continue;
+                    }
+                    if (kb.isPossiblePit(m)) {
+                        kb.setPossiblePit(m, false);
+                        changed = true;
+                    }
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Stench가 난 방문 칸마다, 인접 중 “안전이 아니면서 wumpus 후보”인 칸이 하나뿐이면
+     * 같은 인접의 나머지 칸은 wumpus 후보에서 제외한다(#19).
+     */
+    private boolean applyStenchWumpusSingletonNarrowsNeighbors(KnowledgeBase kb) {
+        if (!kb.isWumpusAlive()) {
+            return false;
+        }
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position s = new Position(x, y);
+                if (!kb.isVisited(s) || !kb.getCellBelief(s).lastPercept().isStench()) {
+                    continue;
+                }
+                List<Position> wumpusCandidates = new ArrayList<>();
+                for (Position n : neighbors(s)) {
+                    if (!kb.isValid(n) || kb.isSafe(n)) {
+                        continue;
+                    }
+                    if (kb.isPossibleWumpus(n)) {
+                        wumpusCandidates.add(n);
+                    }
+                }
+                if (wumpusCandidates.size() != 1) {
+                    continue;
+                }
+                Position only = wumpusCandidates.get(0);
+                for (Position m : neighbors(s)) {
+                    if (!kb.isValid(m) || m.equals(only)) {
+                        continue;
+                    }
+                    if (kb.isPossibleWumpus(m)) {
+                        kb.setPossibleWumpus(m, false);
                         changed = true;
                     }
                 }

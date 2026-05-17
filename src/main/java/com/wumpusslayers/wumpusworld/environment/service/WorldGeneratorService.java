@@ -34,6 +34,7 @@ public class WorldGeneratorService {
         //Gold 배치
         placeGold(grid);
 
+        world.setWumpusAlive(world.hasAnyWumpusOnGrid());
         return world;
     }
 

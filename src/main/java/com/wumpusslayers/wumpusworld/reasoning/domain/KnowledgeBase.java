@@ -59,7 +59,7 @@ public final class KnowledgeBase {
         initializeState();
     }
 
-    /** 움퍼스가 살아 있는지 여부(Scream 관측 시 false로 바뀔 수 있다). */
+    /** KB가 아는 한 맵에 살아 있는 움퍼스가 하나라도 있는지. 비명(percept)만으로는 끄지 않고, 시뮬 등이 {@link #setWumpusAlive(boolean)}로 맞춘다. */
     public boolean isWumpusAlive() {
         return wumpusAlive;
     }
@@ -100,7 +100,11 @@ public final class KnowledgeBase {
         }
     }
 
-    /** 움퍼스 생존 플래그를 직접 설정한다(#13 등에서 규칙 반영 후 갱신). */
+    /**
+     * 맵에 살아 있는 움퍼스가 하나라도 있다고 볼지 여부를 설정한다.
+     * 시뮬이 격자 진실에 맞춰 갱신할 때(예: {@link com.wumpusslayers.wumpusworld.reasoning.service.ReasoningService#syncWumpusAlive(String, boolean)})와 같이 호출되며,
+     * 비명(percept)만으로는 바뀌지 않는다. 이후 {@link com.wumpusslayers.wumpusworld.reasoning.service.RuleEngineService}가 후보 격자를 정리한다.
+     */
     public void setWumpusAlive(boolean wumpusAlive) {
         this.wumpusAlive = wumpusAlive;
     }
@@ -120,7 +124,6 @@ public final class KnowledgeBase {
         cells[xi][yi] = cells[xi][yi].withObservation(percept);
         if (percept.isScream()) {
             this.heardScream = true;
-            this.wumpusAlive = false;
         }
     }
 

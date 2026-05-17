@@ -100,7 +100,7 @@ class KnowledgeUpdateServiceTest {
         service.observe("u1", new Position(1, 2), Percept.builder()
                 .stench(false).breeze(false).glitter(false).bump(false).scream(true)
                 .build());
-        assertFalse(service.getKnowledgeBaseOrNull("u1").isWumpusAlive());
+        assertTrue(service.getKnowledgeBaseOrNull("u1").isWumpusAlive());
         assertTrue(service.getKnowledgeBaseOrNull("u1").isHeardScream());
     }
 }

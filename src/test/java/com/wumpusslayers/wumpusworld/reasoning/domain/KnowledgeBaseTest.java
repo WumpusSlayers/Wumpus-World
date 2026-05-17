@@ -57,8 +57,8 @@ class KnowledgeBaseTest {
     }
 
     @Test
-    @DisplayName("Scream이 포함된 관측은 움퍼스 생존 플래그를 false로 만든다.")
-    void screamObservationKillsWumpusFlag() {
+    @DisplayName("Scream이 포함된 관측은 heardScream만 켜고, wumpusAlive는 시뮬이 끈다.")
+    void screamObservationSetsHeardScreamOnly() {
         KnowledgeBase kb = new KnowledgeBase();
         Percept p = Percept.builder()
                 .stench(false).breeze(false).glitter(false).bump(false).scream(true)
@@ -66,7 +66,7 @@ class KnowledgeBaseTest {
 
         kb.recordCellObservation(new Position(1, 2), p);
 
-        assertFalse(kb.isWumpusAlive());
+        assertTrue(kb.isWumpusAlive());
         assertTrue(kb.isHeardScream());
     }
 

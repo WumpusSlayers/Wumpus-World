@@ -56,8 +56,8 @@ class RuleEngineServiceTest {
     }
 
     @Test
-    @DisplayName("Scream 관측 후 전 격자에서 움퍼스 후보가 제거된다.")
-    void screamClearsAllWumpusCandidates() {
+    @DisplayName("비명만으로는 전 격자 움퍼스 후보가 사라지지 않는다. 전멸 시에는 setWumpusAlive(false) 후 규칙이 비운다.")
+    void screamAloneDoesNotClearWumpusCandidatesUntilGloballyDead() {
         KnowledgeBase kb = new KnowledgeBase();
         kb.recordCellObservation(new Position(1, 1), p(true, false));
         engine.runInference(kb);
@@ -69,12 +69,18 @@ class RuleEngineServiceTest {
 
         engine.runInference(kb);
 
+        assertTrue(kb.isWumpusAlive());
+        assertTrue(kb.isHeardScream());
+        assertTrue(kb.isPossibleWumpus(new Position(1, 2)) || kb.isPossibleWumpus(new Position(2, 1)));
+
+        kb.setWumpusAlive(false);
+        engine.runInference(kb);
+
         for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
             for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
                 assertFalse(kb.isPossibleWumpus(new Position(x, y)), "cell " + x + "," + y);
             }
         }
-        assertFalse(kb.isWumpusAlive());
     }
 
     @Test
@@ -90,7 +96,57 @@ class RuleEngineServiceTest {
         assertEquals(InferenceRule.NO_BREEZE_CLEAR_ADJACENT_PIT_CANDIDATES, order.get(0));
         assertEquals(InferenceRule.NO_STENCH_CLEAR_ADJACENT_WUMPUS_CANDIDATES, order.get(1));
         assertEquals(InferenceRule.BREEZE_MARK_PIT_CANDIDATES, order.get(2));
-        assertEquals(InferenceRule.STENCH_MARK_WUMPUS_CANDIDATES, order.get(3));
-        assertEquals(InferenceRule.SCREAM_WUMPUS_ELIMINATED, order.get(4));
+        assertEquals(InferenceRule.BREEZE_PIT_SINGLETON_NARROWS_NEIGHBORS, order.get(3));
+        assertEquals(InferenceRule.STENCH_MARK_WUMPUS_CANDIDATES, order.get(4));
+        assertEquals(InferenceRule.STENCH_WUMPUS_SINGLETON_NARROWS_NEIGHBORS, order.get(5));
+        assertEquals(InferenceRule.SCREAM_WUMPUS_ELIMINATED, order.get(6));
+    }
+
+    @Test
+    @DisplayName("국소 stench만으로 먼 칸의 움퍼스 후보를 없애지 않는다(다중 움퍼스 가능).")
+    void localStenchDoesNotClearDistantWumpusCandidates() {
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.recordCellObservation(new Position(1, 1), p(false, false));
+        engine.runInference(kb);
+
+        kb.recordCellObservation(new Position(2, 1), p(true, false));
+        engine.runInference(kb);
+
+        assertTrue(kb.isPossibleWumpus(new Position(4, 4)),
+                "멀리 또 다른 움퍼스가 있을 수 있으므로 교집합식 전역 축소는 하지 않는다");
+    }
+
+    @Test
+    @DisplayName("breeze 인접 pit 후보가 하나로 좁혀지면 나머지 인접 pit 후보가 제거된다(#19).")
+    void breezeSingletonNarrowsAdjacentPitCandidates() {
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.recordCellObservation(new Position(1, 1), p(false, false));
+        engine.runInference(kb);
+
+        kb.recordCellObservation(new Position(2, 1), p(false, true));
+        engine.runInference(kb);
+
+        kb.recordCellObservation(new Position(3, 1), p(false, false));
+        engine.runInference(kb);
+
+        assertTrue(kb.isPossiblePit(new Position(2, 2)));
+        assertFalse(kb.isPossiblePit(new Position(3, 1)));
+    }
+
+    @Test
+    @DisplayName("stench 인접 wumpus 후보가 하나로 좁혀지면 나머지 인접 wumpus 후보가 제거된다(#19).")
+    void stenchSingletonNarrowsAdjacentWumpusCandidates() {
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.recordCellObservation(new Position(1, 1), p(false, false));
+        engine.runInference(kb);
+
+        kb.recordCellObservation(new Position(2, 1), p(true, false));
+        engine.runInference(kb);
+
+        kb.recordCellObservation(new Position(3, 1), p(false, false));
+        engine.runInference(kb);
+
+        assertTrue(kb.isPossibleWumpus(new Position(2, 2)));
+        assertFalse(kb.isPossibleWumpus(new Position(3, 1)));
     }
 }

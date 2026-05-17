@@ -44,6 +44,7 @@ public class GameEngine {
 
         var initialPercept = perceptService.getPercept(world, false, false);
         reasoningService.updateFromObservation(userId, world.getAgentPosition(), initialPercept);
+        reasoningService.syncWumpusAlive(userId, world.hasAnyWumpusOnGrid());
 
         System.out.println("새로운 게임 시작! 유저: " + userId);
         System.out.println(world.toString());
@@ -62,6 +63,7 @@ public class GameEngine {
         }
 
         Action result = actionPlannerService.executeAction(world, actionType);
+        reasoningService.syncWumpusAlive(userId, world.hasAnyWumpusOnGrid());
         reasoningService.updateFromObservation(userId, world.getAgentPosition(), result.getPercept());
 
         System.out.println("액션 실행: " + actionType + " | 결과: " + result.getMessage());
