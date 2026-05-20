@@ -21,6 +21,7 @@ public final class KnowledgeBase {
     private final boolean[][] possiblePit;
     private final boolean[][] possibleWumpus;
     private final boolean[][] definitePit;
+    private final boolean[][] definiteWumpus;
 
     private boolean wumpusAlive;
     private boolean heardScream;
@@ -32,6 +33,7 @@ public final class KnowledgeBase {
         this.possiblePit = new boolean[GRID_SIZE][GRID_SIZE];
         this.possibleWumpus = new boolean[GRID_SIZE][GRID_SIZE];
         this.definitePit = new boolean[GRID_SIZE][GRID_SIZE];
+        this.definiteWumpus = new boolean[GRID_SIZE][GRID_SIZE];
         initializeState();
     }
 
@@ -43,6 +45,7 @@ public final class KnowledgeBase {
                 possiblePit[x][y] = true;
                 possibleWumpus[x][y] = true;
                 definitePit[x][y] = false;
+                definiteWumpus[x][y] = false;
             }
         }
         // (1,1) 시작 칸은 안전으로 가정(제안서·환경 규칙과 정합)
@@ -74,7 +77,7 @@ public final class KnowledgeBase {
 
     /**
      * 규칙 엔진(#13)용. 안전으로 확정되면 pit/wumpus 후보를 함께 제거한다.
-     * Pit으로 확정된 칸을 안전으로 표시하면 불변식 위반이다.
+     * Pit/Wumpus으로 확정된 칸을 안전으로 표시하면 불변식 위반이다(#34·#37).
      */
     public void markDefinitelySafe(Position pos) {
         int xi = toIndexX(pos);
@@ -82,14 +85,17 @@ public final class KnowledgeBase {
         if (definitePit[xi][yi]) {
             throw new SimulationException("Invariant violated: safe at definite pit cell " + pos);
         }
+        if (definiteWumpus[xi][yi]) {
+            throw new SimulationException("Invariant violated: safe at definite wumpus cell " + pos);
+        }
         safe[xi][yi] = true;
         possiblePit[xi][yi] = false;
         possibleWumpus[xi][yi] = false;
     }
 
     /**
-     * 해당 칸을 Pit으로 확정한다(예: 에이전트가 그 칸에서 사망). 안전 칸이면 예외.
-     * possiblePit은 true, possibleWumpus는 false로 정합한다.
+     * 해당 칸을 Pit으로 확정한다(예: 에이전트가 그 칸에서 사망). 안전·Wumpus 확정 칸이면 예외.
+     * possiblePit은 true, possibleWumpus는 false로 정합한다(#34).
      */
     public void markDefinitePit(Position pos) {
         int xi = toIndexX(pos);
@@ -97,9 +103,30 @@ public final class KnowledgeBase {
         if (safe[xi][yi]) {
             throw new SimulationException("Invariant violated: definite pit at safe cell " + pos);
         }
+        if (definiteWumpus[xi][yi]) {
+            throw new SimulationException("Invariant violated: definite pit at definite wumpus cell " + pos);
+        }
         definitePit[xi][yi] = true;
         possiblePit[xi][yi] = true;
         possibleWumpus[xi][yi] = false;
+    }
+
+    /**
+     * 해당 칸을 Wumpus로 확정한다(에이전트가 그 칸에서 Wumpus에 사망). 안전·Pit 확정 칸이면 예외.
+     * possibleWumpus는 true, possiblePit은 false로 정합한다(#37).
+     */
+    public void markDefiniteWumpus(Position pos) {
+        int xi = toIndexX(pos);
+        int yi = toIndexY(pos);
+        if (safe[xi][yi]) {
+            throw new SimulationException("Invariant violated: definite wumpus at safe cell " + pos);
+        }
+        if (definitePit[xi][yi]) {
+            throw new SimulationException("Invariant violated: definite wumpus at definite pit cell " + pos);
+        }
+        definiteWumpus[xi][yi] = true;
+        possibleWumpus[xi][yi] = true;
+        possiblePit[xi][yi] = false;
     }
 
     /** 해당 칸에 pit이 있을 수 있는지 설정한다. 안전·Pit 확정 칸에 true면 예외, 확정 Pit에 false면 예외. */
@@ -115,10 +142,13 @@ public final class KnowledgeBase {
         }
     }
 
-    /** 해당 칸에 움퍼스가 있을 수 있는지 설정한다. 안전 칸에 true면 예외. */
+    /** 해당 칸에 움퍼스가 있을 수 있는지 설정한다. 안전 칸에 true면 예외, Wumpus 확정 칸에 false면 예외(#37). */
     public void setPossibleWumpus(Position pos, boolean value) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
+        if (!value && definiteWumpus[xi][yi]) {
+            throw new SimulationException("Invariant violated: cannot clear possible wumpus at definite wumpus cell " + pos);
+        }
         possibleWumpus[xi][yi] = value;
         if (value && safe[xi][yi]) {
             throw new SimulationException("Invariant violated: possible wumpus at safe cell " + pos);
@@ -201,6 +231,13 @@ public final class KnowledgeBase {
         return definitePit[xi][yi];
     }
 
+    /** 해당 칸이 Wumpus로 100% 확정되었는지(#37). */
+    public boolean isDefiniteWumpus(Position pos) {
+        int xi = toIndexX(pos);
+        int yi = toIndexY(pos);
+        return definiteWumpus[xi][yi];
+    }
+
     /**
      * 외부에서 boolean[][] 레퍼런스를 바꾸지 못하도록 복사본을 반환한다.
      */
@@ -221,6 +258,11 @@ public final class KnowledgeBase {
     /** Pit 확정 그리드의 복사본을 반환한다. */
     public boolean[][] copyDefinitePitGrid() {
         return copyGrid(definitePit);
+    }
+
+    /** Wumpus 확정 그리드의 복사본을 반환한다(#37). */
+    public boolean[][] copyDefiniteWumpusGrid() {
+        return copyGrid(definiteWumpus);
     }
 
     private static boolean[][] copyGrid(boolean[][] src) {
@@ -259,12 +301,12 @@ public final class KnowledgeBase {
                 String v = cells[xi][yi].visited() ? "V" : " ";
                 String s = safe[xi][yi] ? "S" : " ";
                 String p = definitePit[xi][yi] ? "!" : (possiblePit[xi][yi] ? "P" : " ");
-                String w = possibleWumpus[xi][yi] ? "W" : " ";
+                String w = definiteWumpus[xi][yi] ? "@" : (possibleWumpus[xi][yi] ? "W" : " ");
                 row.append(String.format("(%d,%d)[%s%s%s%s]   ", x, y, v, s, p, w));
             }
             System.out.println(row.toString());
         }
-        System.out.println("범례 - V:방문, S:안전, P:pit후보, !:pit확정, W:wumpus후보");
+        System.out.println("범례 - V:방문, S:안전, P:pit후보, !:pit확정, W:wumpus후보, @:wumpus확정");
         System.out.println("==================================================");
     }
 }

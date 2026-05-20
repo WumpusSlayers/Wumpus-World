@@ -22,7 +22,7 @@ public class ActionPlannerService {
         boolean bumped = false;
         boolean screamed = false;
         String message = "";
-        boolean diedInPit = false;
+        DeathCause death = DeathCause.NONE;
 
         // 1. 방금 행동/관측이 일어난 위치 (리셋 되기 전 원래 위치)
         Position actionPos = world.getAgentPosition();
@@ -69,7 +69,7 @@ public class ActionPlannerService {
 
         // 3. 행동 후 생존 여부 확인 (구덩이나 움퍼스면 여기서 1,1로 리셋됨)
         if (actionType == ActionType.GO_FORWARD) {
-            diedInPit = checkSurvival(world);
+            death = checkSurvival(world);
         }
 
         boolean isGameOver = world.getStatus() != GameStatus.PLAYING && world.getStatus() != GameStatus.WIN;
@@ -79,7 +79,8 @@ public class ActionPlannerService {
                 .isGameOver(isGameOver || world.getStatus() == GameStatus.ESCAPED)
                 .message(message)
                 .actionPosition(actionPos)
-                .diedInPit(diedInPit)
+                .diedInPit(death == DeathCause.PIT)
+                .diedInWumpus(death == DeathCause.WUMPUS)
                 .build();
     }
 
@@ -103,24 +104,28 @@ public class ActionPlannerService {
     }
 
     /**
-     * 생존 여부 판단. Pit 사망이면 true를 반환하고 (1,1)로 리셋한다.
+     * 생존 여부 판단. 사망 원인을 반환하고 (1,1)로 리셋한다(#34·#37).
      */
-    private boolean checkSurvival(World world) {
+    private DeathCause checkSurvival(World world) {
         Cell currentCell = world.getGrid().getCell(world.getAgentPosition());
 
         // 구덩이에 빠진 경우
         if (currentCell.isHasPit()) {
             System.out.println("⚠️ [EVENT] 구덩이에 빠졌습니다! (1,1)에서 다시 시작합니다.");
             resetAgent(world, GameStatus.PLAYING);
-            return true;
+            return DeathCause.PIT;
         }
         // 웜파스에게 잡힌 경우
         else if (currentCell.isHasWumpus()) {
             System.out.println("⚠️ [EVENT] 웜파스에게 잡아먹혔습니다! (1,1)에서 다시 시작합니다.");
             resetAgent(world, GameStatus.PLAYING);
+            return DeathCause.WUMPUS;
         }
-        return false;
+        return DeathCause.NONE;
     }
+
+    /** 사망 원인(없음/Pit/Wumpus). #34·#37 KB 동기화 트리거 식별용. */
+    private enum DeathCause { NONE, PIT, WUMPUS }
 
     /*
      * 에이전트의 위치와 상태를 초기화

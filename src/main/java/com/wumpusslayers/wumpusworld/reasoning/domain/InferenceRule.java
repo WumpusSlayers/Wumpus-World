@@ -41,7 +41,13 @@ public enum InferenceRule {
      * {@link KnowledgeBase#isDefinitePit(com.wumpusslayers.wumpusworld.environment.domain.Position)} 인 칸은
      * 움퍼스가 있을 수 없으므로 {@code possibleWumpus}를 false로 만든다(#34, 상호 배제).
      */
-    CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE(60);
+    CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE(60),
+
+    /**
+     * {@link KnowledgeBase#isDefiniteWumpus(com.wumpusslayers.wumpusworld.environment.domain.Position)} 인 칸은
+     * Pit이 있을 수 없으므로 {@code possiblePit}을 false로 만든다(#37, 상호 배제).
+     */
+    CONFIRMED_WUMPUS_CLEARS_PIT_CANDIDATE(70);
 
     private final int defaultPriority;
 

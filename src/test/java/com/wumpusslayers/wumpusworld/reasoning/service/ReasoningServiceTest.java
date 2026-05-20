@@ -90,4 +90,32 @@ class ReasoningServiceTest {
         reasoningService.markAgentDiedInPit("u1", null);
         assertArrayEquals(before, kb.copyDefinitePitGrid());
     }
+
+    @Test
+    @DisplayName("markAgentDiedInWumpus는 definiteWumpus를 켜고 그 칸은 safeCells에 들어가지 않는다(#37).")
+    void markAgentDiedInWumpusUpdatesKnowledgeBase() {
+        reasoningService.updateFromObservation("u1", new Position(1, 1), p(false, false));
+        Position deathPos = new Position(2, 2);
+
+        reasoningService.markAgentDiedInWumpus("u1", deathPos);
+
+        var kb = knowledgeUpdateService.getKnowledgeBaseOrNull("u1");
+        assertNotNull(kb);
+        assertTrue(kb.isDefiniteWumpus(deathPos));
+        assertFalse(kb.isPossiblePit(deathPos));
+        assertFalse(kb.isSafe(deathPos));
+
+        var summary = reasoningService.getKnowledgeSummary("u1");
+        assertFalse(summary.safeCells().contains(new com.wumpusslayers.wumpusworld.reasoning.dto.response.PositionCoordinate(2, 2)));
+    }
+
+    @Test
+    @DisplayName("markAgentDiedInWumpus(null)은 no-op이다.")
+    void markAgentDiedInWumpusNullPositionIsNoOp() {
+        reasoningService.updateFromObservation("u1", new Position(1, 1), p(false, false));
+        var kb = knowledgeUpdateService.getKnowledgeBaseOrNull("u1");
+        boolean[][] before = kb.copyDefiniteWumpusGrid();
+        reasoningService.markAgentDiedInWumpus("u1", null);
+        assertArrayEquals(before, kb.copyDefiniteWumpusGrid());
+    }
 }

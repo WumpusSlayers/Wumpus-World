@@ -66,6 +66,9 @@ public class GameEngine {
         if (result.isDiedInPit() && result.getActionPosition() != null) {
             reasoningService.markAgentDiedInPit(userId, result.getActionPosition());
         }
+        if (result.isDiedInWumpus() && result.getActionPosition() != null) {
+            reasoningService.markAgentDiedInWumpus(userId, result.getActionPosition());
+        }
         reasoningService.syncWumpusAlive(userId, world.hasAnyWumpusOnGrid());
         reasoningService.updateFromObservation(userId, result.getActionPosition(), result.getPercept());
 

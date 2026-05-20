@@ -13,8 +13,12 @@ public class Action {
     private final Position actionPosition;    // 방금 행동/관측이 일어난 위치(#35)
     /**
      * 이번 GO_FORWARD에서 Pit으로 사망했는지. KB definitePit 동기화용(#34).
-     * Wumpus 사망이면 false.
      */
     @Builder.Default
     private final boolean diedInPit = false;
+    /**
+     * 이번 GO_FORWARD에서 Wumpus에 사망했는지. KB definiteWumpus 동기화용(#37).
+     */
+    @Builder.Default
+    private final boolean diedInWumpus = false;
 }

@@ -101,6 +101,7 @@ class RuleEngineServiceTest {
         assertEquals(InferenceRule.STENCH_WUMPUS_SINGLETON_NARROWS_NEIGHBORS, order.get(5));
         assertEquals(InferenceRule.SCREAM_WUMPUS_ELIMINATED, order.get(6));
         assertEquals(InferenceRule.CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE, order.get(7));
+        assertEquals(InferenceRule.CONFIRMED_WUMPUS_CLEARS_PIT_CANDIDATE, order.get(8));
     }
 
     @Test
@@ -129,6 +130,49 @@ class RuleEngineServiceTest {
 
         assertTrue(kb.isDefinitePit(pit));
         assertFalse(kb.isPossibleWumpus(pit));
+    }
+
+    @Test
+    @DisplayName("Wumpus 확정 칸은 추론 후에도 safe로 바뀌지 않는다(#37).")
+    void definiteWumpusVisitedCellStaysUnsafe() {
+        KnowledgeBase kb = new KnowledgeBase();
+        Position wumpus = new Position(2, 3);
+
+        // 시뮬은 사망 좌표에 관측을 기록한 뒤 markDefiniteWumpus를 호출함
+        kb.recordCellObservation(wumpus, p(false, false));
+        kb.markDefiniteWumpus(wumpus);
+
+        engine.runInference(kb);
+
+        assertTrue(kb.isDefiniteWumpus(wumpus));
+        assertFalse(kb.isSafe(wumpus));
+        assertFalse(kb.isPossiblePit(wumpus));
+    }
+
+    @Test
+    @DisplayName("Wumpus 확정 칸은 추론 후 possiblePit가 false다(#37, 상호 배제).")
+    void definiteWumpusClearsPitCandidate() {
+        KnowledgeBase kb = new KnowledgeBase();
+        Position wumpus = new Position(3, 3);
+
+        kb.markDefiniteWumpus(wumpus);
+        engine.runInference(kb);
+
+        assertFalse(kb.isPossiblePit(wumpus));
+        assertTrue(kb.isPossibleWumpus(wumpus));
+    }
+
+    @Test
+    @DisplayName("wumpusAlive=false에서도 definiteWumpus 칸은 invariant를 안 깬다(#37).")
+    void screamRuleRespectsDefiniteWumpus() {
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.markDefiniteWumpus(new Position(2, 3));
+
+        kb.setWumpusAlive(false);
+        assertDoesNotThrow(() -> engine.runInference(kb));
+
+        assertTrue(kb.isPossibleWumpus(new Position(2, 3)));
+        assertFalse(kb.isPossibleWumpus(new Position(4, 4)));
     }
 
     @Test
