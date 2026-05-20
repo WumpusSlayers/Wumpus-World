@@ -209,4 +209,25 @@ public final class KnowledgeBase {
             throw new SimulationException("유효하지 않은 좌표입니다: " + pos);
         }
     }
+
+    /** 콘솔에 현재 지식베이스 상태를 4x4 격자로 시각화하여 출력 */
+    public void printState() {
+        System.out.println("==================================================");
+        System.out.println("🧠 [KnowledgeBase Snapshot]");
+        for (int y = GRID_SIZE; y >= 1; y--) {
+            StringBuilder row = new StringBuilder();
+            for (int x = 1; x <= GRID_SIZE; x++) {
+                int xi = x - 1;
+                int yi = y - 1;
+                String v = cells[xi][yi].visited() ? "V" : " ";
+                String s = safe[xi][yi] ? "S" : " ";
+                String p = possiblePit[xi][yi] ? "P" : " ";
+                String w = possibleWumpus[xi][yi] ? "W" : " ";
+                row.append(String.format("(%d,%d)[%s%s%s%s]   ", x, y, v, s, p, w));
+            }
+            System.out.println(row.toString());
+        }
+        System.out.println("범례 - V:방문(Visited), S:안전(Safe), P:구덩이위험(Pit), W:웸퍼스위험(Wumpus)");
+        System.out.println("==================================================");
+    }
 }

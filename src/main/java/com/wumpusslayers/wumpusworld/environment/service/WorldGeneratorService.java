@@ -49,22 +49,31 @@ public class WorldGeneratorService {
                 if (random.nextDouble() < 0.10) {
                     cell.setHasPit(true);
                 }
-
-                //Wumpus 배치
-                if (random.nextDouble() < 0.10) {
+                //Wumpus 배치 (구덩이가 없는 곳에만 배치하여 겹침 방지)
+                else if (random.nextDouble() < 0.10) {
                     cell.setHasWumpus(true);
                 }
             }
         }
     }
 
-    // 시작지점 안전 보장
+    // 시작지점 및 인접 칸 안전 보장
     private void ensureStartZoneSafety(Grid grid) {
-        Position startPos = new Position(1,1);
-        Cell startCell = grid.getCell(startPos);
+        // (1,1) 시작점 안전
+        Cell startCell = grid.getCell(new Position(1, 1));
         startCell.setHasPit(false);
         startCell.setHasWumpus(false);
         startCell.setHasGold(false);
+
+        // (1,2) 안전
+        Cell adjacent1 = grid.getCell(new Position(1, 2));
+        adjacent1.setHasPit(false);
+        adjacent1.setHasWumpus(false);
+
+        // (2,1) 안전
+        Cell adjacent2 = grid.getCell(new Position(2, 1));
+        adjacent2.setHasPit(false);
+        adjacent2.setHasWumpus(false);
     }
 
     // Pit이나 Wumpus가 없는 안전한 칸 중 하나를 골라 금을 배치

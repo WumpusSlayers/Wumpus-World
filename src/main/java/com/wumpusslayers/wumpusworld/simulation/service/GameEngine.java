@@ -64,7 +64,7 @@ public class GameEngine {
 
         Action result = actionPlannerService.executeAction(world, actionType);
         reasoningService.syncWumpusAlive(userId, world.hasAnyWumpusOnGrid());
-        reasoningService.updateFromObservation(userId, world.getAgentPosition(), result.getPercept());
+        reasoningService.updateFromObservation(userId, result.getActionPosition(), result.getPercept());
 
         System.out.println("액션 실행: " + actionType + " | 결과: " + result.getMessage());
         System.out.println(world.toString());

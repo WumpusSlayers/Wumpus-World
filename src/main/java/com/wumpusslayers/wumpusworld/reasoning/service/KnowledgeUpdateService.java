@@ -34,6 +34,9 @@ public class KnowledgeUpdateService {
         knowledgeBySession
                 .computeIfAbsent(sessionId, id -> new KnowledgeBase())
                 .recordCellObservation(position, percept);
+
+        // 테스트용 로그 출력
+        System.out.println("📝 [KB 업데이트] 좌표: " + position + " | 관측: " + percept);
     }
 
     /**

@@ -23,11 +23,14 @@ public class ActionPlannerService {
         boolean screamed = false;
         String message = "";
 
+        // 1. 방금 행동/관측이 일어난 위치 (리셋 되기 전 원래 위치)
+        Position actionPos = world.getAgentPosition();
+
         switch (actionType) {
             case GO_FORWARD -> {
                 bumped = moveForward(world);
                 message = bumped ? "벽에 부딪혔습니다! (Bump)" : "앞으로 한 칸 이동 했습니다.";
-                checkSurvival(world); //이동 후 생존 확인
+                actionPos = world.getAgentPosition(); // 이동 후의 실제 위치로 갱신
             }
 
             case TURN_LEFT -> {
@@ -60,14 +63,21 @@ public class ActionPlannerService {
             }
         }
 
-        // 행동 후 새로운 지각 정보 생성
+        // 2. 리셋되기 전에 현재(실제) 위치를 기준으로 Percept를 구하기
         Percept percept = perceptService.getPercept(world, bumped, screamed);
+
+        // 3. 행동 후 생존 여부 확인 (구덩이나 움퍼스면 여기서 1,1로 리셋됨)
+        if (actionType == ActionType.GO_FORWARD) {
+            checkSurvival(world);
+        }
+
         boolean isGameOver = world.getStatus() != GameStatus.PLAYING && world.getStatus() != GameStatus.WIN;
 
         return Action.builder()
                 .percept(percept)
                 .isGameOver(isGameOver || world.getStatus() == GameStatus.ESCAPED)
                 .message(message)
+                .actionPosition(actionPos)
                 .build();
     }
 

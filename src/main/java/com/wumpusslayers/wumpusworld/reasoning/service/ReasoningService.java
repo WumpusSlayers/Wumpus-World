@@ -54,6 +54,7 @@ public class ReasoningService {
         KnowledgeBase kb = knowledgeUpdateService.getKnowledgeBaseOrNull(sessionId);
         if (kb != null) {
             ruleEngineService.runInference(kb);
+            kb.printState(); // 추론 완료 후 현재 KB 상태 시각화 출력
         }
     }
 

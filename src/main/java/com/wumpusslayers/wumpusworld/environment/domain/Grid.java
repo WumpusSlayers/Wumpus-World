@@ -5,6 +5,7 @@ import lombok.Getter;
 
 /*
 * 4x4 크기의 격자 전체를 생성하고 관리하는 코드*/
+@Getter
 public class Grid {
     /* Wumpus World
         (1,4) (2,4) (3,4) (4,4)
