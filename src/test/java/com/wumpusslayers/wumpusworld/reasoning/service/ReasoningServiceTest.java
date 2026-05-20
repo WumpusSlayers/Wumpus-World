@@ -66,4 +66,28 @@ class ReasoningServiceTest {
                 reasoningService.updateFromObservation("", new Position(1, 1), p(false, false)));
         assertThrows(SimulationException.class, () -> reasoningService.getKnowledgeSummary("  "));
     }
+
+    @Test
+    @DisplayName("markAgentDiedInPit는 definitePit을 켜고 possibleWumpus를 끈다(#34).")
+    void markAgentDiedInPitUpdatesKnowledgeBase() {
+        reasoningService.updateFromObservation("u1", new Position(1, 1), p(false, false));
+        Position deathPos = new Position(2, 2);
+
+        reasoningService.markAgentDiedInPit("u1", deathPos);
+
+        var kb = knowledgeUpdateService.getKnowledgeBaseOrNull("u1");
+        assertNotNull(kb);
+        assertTrue(kb.isDefinitePit(deathPos));
+        assertFalse(kb.isPossibleWumpus(deathPos));
+    }
+
+    @Test
+    @DisplayName("markAgentDiedInPit(null)은 no-op이다.")
+    void markAgentDiedInPitNullPositionIsNoOp() {
+        reasoningService.updateFromObservation("u1", new Position(1, 1), p(false, false));
+        var kb = knowledgeUpdateService.getKnowledgeBaseOrNull("u1");
+        boolean[][] before = kb.copyDefinitePitGrid();
+        reasoningService.markAgentDiedInPit("u1", null);
+        assertArrayEquals(before, kb.copyDefinitePitGrid());
+    }
 }

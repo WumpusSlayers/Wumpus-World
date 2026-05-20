@@ -100,6 +100,35 @@ class RuleEngineServiceTest {
         assertEquals(InferenceRule.STENCH_MARK_WUMPUS_CANDIDATES, order.get(4));
         assertEquals(InferenceRule.STENCH_WUMPUS_SINGLETON_NARROWS_NEIGHBORS, order.get(5));
         assertEquals(InferenceRule.SCREAM_WUMPUS_ELIMINATED, order.get(6));
+        assertEquals(InferenceRule.CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE, order.get(7));
+    }
+
+    @Test
+    @DisplayName("Pit 확정 칸은 추론 후 possibleWumpus가 false다(#34).")
+    void definitePitClearsWumpusCandidate() {
+        KnowledgeBase kb = new KnowledgeBase();
+        Position pit = new Position(3, 3);
+        kb.markDefinitePit(pit);
+        engine.runInference(kb);
+        assertFalse(kb.isPossibleWumpus(pit));
+        assertTrue(kb.isPossiblePit(pit));
+    }
+
+    @Test
+    @DisplayName("stench 인접이 Pit 확정이면 wumpus 후보로 다시 켜지지 않는다(#34).")
+    void stenchDoesNotReMarkDefinitePitAsWumpusCandidate() {
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.recordCellObservation(new Position(1, 1), p(false, false));
+        engine.runInference(kb);
+        kb.recordCellObservation(new Position(2, 1), p(true, false));
+        engine.runInference(kb);
+
+        Position pit = new Position(3, 1);
+        kb.markDefinitePit(pit);
+        engine.runInference(kb);
+
+        assertTrue(kb.isDefinitePit(pit));
+        assertFalse(kb.isPossibleWumpus(pit));
     }
 
     @Test

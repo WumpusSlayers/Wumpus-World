@@ -94,4 +94,43 @@ class KnowledgeBaseTest {
         copy[0][0] = false;
         assertTrue(kb.isSafe(new Position(1, 1)));
     }
+
+    @Test
+    @DisplayName("markDefinitePit은 definitePit=true, possibleWumpus=false로 만든다(#34).")
+    void markDefinitePitSetsFlagsConsistently() {
+        KnowledgeBase kb = new KnowledgeBase();
+        Position p = new Position(3, 3);
+
+        kb.markDefinitePit(p);
+
+        assertTrue(kb.isDefinitePit(p));
+        assertTrue(kb.isPossiblePit(p));
+        assertFalse(kb.isPossibleWumpus(p));
+        assertFalse(kb.isSafe(p));
+    }
+
+    @Test
+    @DisplayName("안전 칸을 markDefinitePit 하면 SimulationException이다.")
+    void markDefinitePitOnSafeCellThrows() {
+        KnowledgeBase kb = new KnowledgeBase();
+        assertThrows(SimulationException.class, () -> kb.markDefinitePit(new Position(1, 1)));
+    }
+
+    @Test
+    @DisplayName("Pit 확정 칸을 markDefinitelySafe 하면 SimulationException이다.")
+    void markDefinitelySafeOnDefinitePitThrows() {
+        KnowledgeBase kb = new KnowledgeBase();
+        Position p = new Position(2, 3);
+        kb.markDefinitePit(p);
+        assertThrows(SimulationException.class, () -> kb.markDefinitelySafe(p));
+    }
+
+    @Test
+    @DisplayName("clear 후 definitePit도 false로 돌아간다.")
+    void clearResetsDefinitePit() {
+        KnowledgeBase kb = new KnowledgeBase();
+        kb.markDefinitePit(new Position(2, 2));
+        kb.clear();
+        assertFalse(kb.isDefinitePit(new Position(2, 2)));
+    }
 }

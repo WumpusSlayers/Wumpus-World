@@ -20,6 +20,7 @@ public final class KnowledgeBase {
     private final boolean[][] safe;
     private final boolean[][] possiblePit;
     private final boolean[][] possibleWumpus;
+    private final boolean[][] definitePit;
 
     private boolean wumpusAlive;
     private boolean heardScream;
@@ -30,6 +31,7 @@ public final class KnowledgeBase {
         this.safe = new boolean[GRID_SIZE][GRID_SIZE];
         this.possiblePit = new boolean[GRID_SIZE][GRID_SIZE];
         this.possibleWumpus = new boolean[GRID_SIZE][GRID_SIZE];
+        this.definitePit = new boolean[GRID_SIZE][GRID_SIZE];
         initializeState();
     }
 
@@ -40,6 +42,7 @@ public final class KnowledgeBase {
                 safe[x][y] = false;
                 possiblePit[x][y] = true;
                 possibleWumpus[x][y] = true;
+                definitePit[x][y] = false;
             }
         }
         // (1,1) 시작 칸은 안전으로 가정(제안서·환경 규칙과 정합)
@@ -71,19 +74,41 @@ public final class KnowledgeBase {
 
     /**
      * 규칙 엔진(#13)용. 안전으로 확정되면 pit/wumpus 후보를 함께 제거한다.
+     * Pit으로 확정된 칸을 안전으로 표시하면 불변식 위반이다.
      */
     public void markDefinitelySafe(Position pos) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
+        if (definitePit[xi][yi]) {
+            throw new SimulationException("Invariant violated: safe at definite pit cell " + pos);
+        }
         safe[xi][yi] = true;
         possiblePit[xi][yi] = false;
         possibleWumpus[xi][yi] = false;
     }
 
-    /** 해당 칸에 pit이 있을 수 있는지 설정한다. 안전 칸에 true면 예외. */
+    /**
+     * 해당 칸을 Pit으로 확정한다(예: 에이전트가 그 칸에서 사망). 안전 칸이면 예외.
+     * possiblePit은 true, possibleWumpus는 false로 정합한다.
+     */
+    public void markDefinitePit(Position pos) {
+        int xi = toIndexX(pos);
+        int yi = toIndexY(pos);
+        if (safe[xi][yi]) {
+            throw new SimulationException("Invariant violated: definite pit at safe cell " + pos);
+        }
+        definitePit[xi][yi] = true;
+        possiblePit[xi][yi] = true;
+        possibleWumpus[xi][yi] = false;
+    }
+
+    /** 해당 칸에 pit이 있을 수 있는지 설정한다. 안전·Pit 확정 칸에 true면 예외, 확정 Pit에 false면 예외. */
     public void setPossiblePit(Position pos, boolean value) {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
+        if (!value && definitePit[xi][yi]) {
+            throw new SimulationException("Invariant violated: cannot clear possible pit at definite pit cell " + pos);
+        }
         possiblePit[xi][yi] = value;
         if (value && safe[xi][yi]) {
             throw new SimulationException("Invariant violated: possible pit at safe cell " + pos);
@@ -169,6 +194,13 @@ public final class KnowledgeBase {
         return possibleWumpus[xi][yi];
     }
 
+    /** 해당 칸이 Pit으로 100% 확정되었는지. */
+    public boolean isDefinitePit(Position pos) {
+        int xi = toIndexX(pos);
+        int yi = toIndexY(pos);
+        return definitePit[xi][yi];
+    }
+
     /**
      * 외부에서 boolean[][] 레퍼런스를 바꾸지 못하도록 복사본을 반환한다.
      */
@@ -184,6 +216,11 @@ public final class KnowledgeBase {
     /** 움퍼스 후보 그리드의 복사본을 반환한다. */
     public boolean[][] copyPossibleWumpusGrid() {
         return copyGrid(possibleWumpus);
+    }
+
+    /** Pit 확정 그리드의 복사본을 반환한다. */
+    public boolean[][] copyDefinitePitGrid() {
+        return copyGrid(definitePit);
     }
 
     private static boolean[][] copyGrid(boolean[][] src) {
@@ -221,13 +258,13 @@ public final class KnowledgeBase {
                 int yi = y - 1;
                 String v = cells[xi][yi].visited() ? "V" : " ";
                 String s = safe[xi][yi] ? "S" : " ";
-                String p = possiblePit[xi][yi] ? "P" : " ";
+                String p = definitePit[xi][yi] ? "!" : (possiblePit[xi][yi] ? "P" : " ");
                 String w = possibleWumpus[xi][yi] ? "W" : " ";
                 row.append(String.format("(%d,%d)[%s%s%s%s]   ", x, y, v, s, p, w));
             }
             System.out.println(row.toString());
         }
-        System.out.println("범례 - V:방문(Visited), S:안전(Safe), P:구덩이위험(Pit), W:웸퍼스위험(Wumpus)");
+        System.out.println("범례 - V:방문, S:안전, P:pit후보, !:pit확정, W:wumpus후보");
         System.out.println("==================================================");
     }
 }

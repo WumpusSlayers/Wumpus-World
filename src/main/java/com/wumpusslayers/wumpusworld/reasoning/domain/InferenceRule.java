@@ -35,7 +35,13 @@ public enum InferenceRule {
      * 비명(percept)만으로 생존 플래그가 바뀌지 않으므로, 다중 움퍼스에서는 시뮬 등이 플래그를 맞춘 뒤 이 규칙이 동작한다(#13).
      * 식별자명은 관례상 남아 있으며 동작은 {@code isWumpusAlive} 기준이다.
      */
-    SCREAM_WUMPUS_ELIMINATED(50);
+    SCREAM_WUMPUS_ELIMINATED(50),
+
+    /**
+     * {@link KnowledgeBase#isDefinitePit(com.wumpusslayers.wumpusworld.environment.domain.Position)} 인 칸은
+     * 움퍼스가 있을 수 없으므로 {@code possibleWumpus}를 false로 만든다(#34, 상호 배제).
+     */
+    CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE(60);
 
     private final int defaultPriority;
 

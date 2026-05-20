@@ -47,6 +47,23 @@ public class ReasoningService {
     }
 
     /**
+     * Pit으로 사망한 좌표를 KB {@code definitePit}에 반영하고 추론을 한 번 돌린다(#34).
+     * {@link com.wumpusslayers.wumpusworld.simulation.service.GameEngine}에서 관측 반영 전에 호출한다.
+     */
+    public void markAgentDiedInPit(String sessionId, Position position) {
+        requireSessionId(sessionId);
+        if (position == null) {
+            return;
+        }
+        KnowledgeBase kb = knowledgeUpdateService.getKnowledgeBaseOrNull(sessionId);
+        if (kb == null) {
+            return;
+        }
+        kb.markDefinitePit(position);
+        ruleEngineService.runInference(kb);
+    }
+
+    /**
      * 현재 KB에 대해 규칙 엔진만 다시 적용한다. KB가 없으면 아무 것도 하지 않는다.
      */
     public void runInference(String sessionId) {

@@ -60,6 +60,7 @@ public class RuleEngineService {
         changed |= applyRule(kb, InferenceRule.BREEZE_PIT_SINGLETON_NARROWS_NEIGHBORS, fired, this::applyBreezePitSingletonNarrowsNeighbors);
         changed |= applyRule(kb, InferenceRule.STENCH_MARK_WUMPUS_CANDIDATES, fired, this::applyStenchMarksAdjacentWumpusCandidates);
         changed |= applyRule(kb, InferenceRule.STENCH_WUMPUS_SINGLETON_NARROWS_NEIGHBORS, fired, this::applyStenchWumpusSingletonNarrowsNeighbors);
+        changed |= applyRule(kb, InferenceRule.CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE, fired, this::applyConfirmedPitClearsWumpusCandidate);
         changed |= applyCandidateFreeCellsAsSafe(kb);
 
         if (fired != null && !fired.isEmpty()) {
@@ -94,7 +95,7 @@ public class RuleEngineService {
         for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
             for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
                 Position p = new Position(x, y);
-                if (!kb.isVisited(p)) {
+                if (!kb.isVisited(p) || kb.isDefinitePit(p)) {
                     continue;
                 }
                 if (!kb.isSafe(p) || kb.isPossiblePit(p) || kb.isPossibleWumpus(p)) {
@@ -138,7 +139,7 @@ public class RuleEngineService {
                     continue;
                 }
                 for (Position n : neighbors(p)) {
-                    if (!kb.isValid(n)) {
+                    if (!kb.isValid(n) || kb.isDefinitePit(n)) {
                         continue;
                     }
                     if (kb.isPossiblePit(n)) {
@@ -197,7 +198,7 @@ public class RuleEngineService {
         return changed;
     }
 
-    /** 악취가 있고 움퍼스가 살아 있으면: 안전이 아닌 인접 칸에 wumpus 후보를 표시한다. */
+    /** 악취가 있고 움퍼스가 살아 있으면: 안전·Pit 확정이 아닌 인접 칸에 wumpus 후보를 표시한다. */
     private boolean applyStenchMarksAdjacentWumpusCandidates(KnowledgeBase kb) {
         if (!kb.isWumpusAlive()) {
             return false;
@@ -210,7 +211,7 @@ public class RuleEngineService {
                     continue;
                 }
                 for (Position n : neighbors(p)) {
-                    if (!kb.isValid(n) || kb.isSafe(n)) {
+                    if (!kb.isValid(n) || kb.isSafe(n) || kb.isDefinitePit(n)) {
                         continue;
                     }
                     if (!kb.isPossibleWumpus(n)) {
@@ -249,7 +250,7 @@ public class RuleEngineService {
                 }
                 Position only = pitCandidates.get(0);
                 for (Position m : neighbors(b)) {
-                    if (!kb.isValid(m) || m.equals(only)) {
+                    if (!kb.isValid(m) || m.equals(only) || kb.isDefinitePit(m)) {
                         continue;
                     }
                     if (kb.isPossiblePit(m)) {
@@ -298,6 +299,21 @@ public class RuleEngineService {
                         kb.setPossibleWumpus(m, false);
                         changed = true;
                     }
+                }
+            }
+        }
+        return changed;
+    }
+
+    /** Pit으로 확정된 칸은 wumpus 후보에서 제거한다(#34). */
+    private boolean applyConfirmedPitClearsWumpusCandidate(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (kb.isDefinitePit(p) && kb.isPossibleWumpus(p)) {
+                    kb.setPossibleWumpus(p, false);
+                    changed = true;
                 }
             }
         }
