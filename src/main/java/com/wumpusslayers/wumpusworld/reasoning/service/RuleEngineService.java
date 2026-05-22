@@ -58,9 +58,13 @@ public class RuleEngineService {
         changed |= applyRule(kb, InferenceRule.NO_STENCH_CLEAR_ADJACENT_WUMPUS_CANDIDATES, fired, this::applyNoStenchClearsAdjacentWumpus);
         changed |= applyRule(kb, InferenceRule.BREEZE_MARK_PIT_CANDIDATES, fired, this::applyBreezeMarksAdjacentPitCandidates);
         changed |= applyRule(kb, InferenceRule.BREEZE_PIT_SINGLETON_NARROWS_NEIGHBORS, fired, this::applyBreezePitSingletonNarrowsNeighbors);
+        changed |= applyRule(kb, InferenceRule.BREEZE_UNIQUE_UNSAFE_NEIGHBOR_IDENTIFIES_PIT, fired, this::applyBreezeIdentifiesUniqueUnsafeNeighborAsPit);
         changed |= applyRule(kb, InferenceRule.STENCH_MARK_WUMPUS_CANDIDATES, fired, this::applyStenchMarksAdjacentWumpusCandidates);
         changed |= applyRule(kb, InferenceRule.STENCH_WUMPUS_SINGLETON_NARROWS_NEIGHBORS, fired, this::applyStenchWumpusSingletonNarrowsNeighbors);
+        changed |= applyRule(kb, InferenceRule.STENCH_UNIQUE_UNSAFE_NEIGHBOR_IDENTIFIES_WUMPUS, fired, this::applyStenchIdentifiesUniqueUnsafeNeighborAsWumpus);
         changed |= applyRule(kb, InferenceRule.CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE, fired, this::applyConfirmedPitClearsWumpusCandidate);
+        changed |= applyRule(kb, InferenceRule.DEFINITE_PIT_EXPLAINS_BREEZE, fired, this::applyDefinitePitExplainsAdjacentBreeze);
+        changed |= applyRule(kb, InferenceRule.DEFINITE_WUMPUS_EXPLAINS_STENCH, fired, this::applyDefiniteWumpusExplainsAdjacentStench);
         changed |= applyRule(kb, InferenceRule.CONFIRMED_WUMPUS_CLEARS_PIT_CANDIDATE, fired, this::applyConfirmedWumpusClearsPitCandidate);
         changed |= applyCandidateFreeCellsAsSafe(kb);
 
@@ -188,8 +192,21 @@ public class RuleEngineService {
                 if (!kb.isVisited(p) || !kb.getCellBelief(p).lastPercept().isBreeze()) {
                     continue;
                 }
+                boolean breezeExplainedByDefinitePit = false;
                 for (Position n : neighbors(p)) {
-                    if (!kb.isValid(n) || kb.isSafe(n) || kb.isDefiniteWumpus(n)) {
+                    if (kb.isValid(n) && kb.isDefinitePit(n)) {
+                        breezeExplainedByDefinitePit = true;
+                        break;
+                    }
+                }
+                if (breezeExplainedByDefinitePit) {
+                    continue;
+                }
+                for (Position n : neighbors(p)) {
+                    if (!kb.isValid(n) || kb.isSafe(n) || kb.isDefiniteWumpus(n) || kb.isDefinitePit(n)) {
+                        continue;
+                    }
+                    if (isRuledOutAsPitByNoBreezeAtAdjacentVisitedCell(kb, n)) {
                         continue;
                     }
                     if (!kb.isPossiblePit(n)) {
@@ -214,8 +231,21 @@ public class RuleEngineService {
                 if (!kb.isVisited(p) || !kb.getCellBelief(p).lastPercept().isStench()) {
                     continue;
                 }
+                boolean stenchExplainedByDefiniteWumpus = false;
                 for (Position n : neighbors(p)) {
-                    if (!kb.isValid(n) || kb.isSafe(n) || kb.isDefinitePit(n)) {
+                    if (kb.isValid(n) && kb.isDefiniteWumpus(n)) {
+                        stenchExplainedByDefiniteWumpus = true;
+                        break;
+                    }
+                }
+                if (stenchExplainedByDefiniteWumpus) {
+                    continue;
+                }
+                for (Position n : neighbors(p)) {
+                    if (!kb.isValid(n) || kb.isSafe(n) || kb.isDefinitePit(n) || kb.isDefiniteWumpus(n)) {
+                        continue;
+                    }
+                    if (isRuledOutAsWumpusByNoStenchAtAdjacentVisitedCell(kb, n)) {
                         continue;
                     }
                     if (!kb.isPossibleWumpus(n)) {
@@ -226,6 +256,48 @@ public class RuleEngineService {
             }
         }
         return changed;
+    }
+
+    /**
+     * 방문한 무악취 칸의 이웃이면 wumpus 후보가 될 수 없다(#13·#39).
+     * 다른 stench 칸이 후보를 다시 켜는 진동을 막는다.
+     */
+    private static boolean isRuledOutAsWumpusByNoStenchAtAdjacentVisitedCell(KnowledgeBase kb, Position candidate) {
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position observed = new Position(x, y);
+                if (!kb.isVisited(observed) || kb.getCellBelief(observed).lastPercept().isStench()) {
+                    continue;
+                }
+                for (Position n : neighbors(observed)) {
+                    if (n.equals(candidate)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 방문한 무풍 칸의 이웃이면 pit 후보가 될 수 없다(#13·#39).
+     * 다른 breeze 칸이 후보를 다시 켜는 진동을 막는다.
+     */
+    private static boolean isRuledOutAsPitByNoBreezeAtAdjacentVisitedCell(KnowledgeBase kb, Position candidate) {
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position observed = new Position(x, y);
+                if (!kb.isVisited(observed) || kb.getCellBelief(observed).lastPercept().isBreeze()) {
+                    continue;
+                }
+                for (Position n : neighbors(observed)) {
+                    if (n.equals(candidate)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -310,6 +382,179 @@ public class RuleEngineService {
         return changed;
     }
 
+    /**
+     * Breeze 칸 인접 중 안전이 아닌 칸이 하나뿐이면 그 칸을 Pit으로 확정한다(#39).
+     */
+    private boolean applyBreezeIdentifiesUniqueUnsafeNeighborAsPit(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position b = new Position(x, y);
+                if (!kb.isVisited(b) || !kb.getCellBelief(b).lastPercept().isBreeze()) {
+                    continue;
+                }
+                boolean breezeExplainedByDefinitePit = false;
+                for (Position n : neighbors(b)) {
+                    if (kb.isValid(n) && kb.isDefinitePit(n)) {
+                        breezeExplainedByDefinitePit = true;
+                        break;
+                    }
+                }
+                if (breezeExplainedByDefinitePit) {
+                    continue;
+                }
+                Position onlyUnsafe = null;
+                int unsafeCount = 0;
+                for (Position n : neighbors(b)) {
+                    if (!kb.isValid(n) || kb.isDefinitePit(n) || kb.isDefiniteWumpus(n)) {
+                        continue;
+                    }
+                    if (!kb.isSafe(n)) {
+                        unsafeCount++;
+                        onlyUnsafe = n;
+                    }
+                }
+                if (unsafeCount != 1 || onlyUnsafe == null || kb.isDefinitePit(onlyUnsafe)) {
+                    continue;
+                }
+                kb.markDefinitePit(onlyUnsafe);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Stench 칸 인접 중 안전이 아닌 칸이 하나뿐이면 그 칸을 Wumpus로 확정한다(#39).
+     */
+    private boolean applyStenchIdentifiesUniqueUnsafeNeighborAsWumpus(KnowledgeBase kb) {
+        if (!kb.isWumpusAlive()) {
+            return false;
+        }
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position s = new Position(x, y);
+                if (!kb.isVisited(s) || !kb.getCellBelief(s).lastPercept().isStench()) {
+                    continue;
+                }
+                boolean stenchExplainedByDefiniteWumpus = false;
+                for (Position n : neighbors(s)) {
+                    if (kb.isValid(n) && kb.isDefiniteWumpus(n)) {
+                        stenchExplainedByDefiniteWumpus = true;
+                        break;
+                    }
+                }
+                if (stenchExplainedByDefiniteWumpus) {
+                    continue;
+                }
+                Position onlyUnsafe = null;
+                int unsafeCount = 0;
+                for (Position n : neighbors(s)) {
+                    if (!kb.isValid(n) || kb.isDefinitePit(n) || kb.isDefiniteWumpus(n)) {
+                        continue;
+                    }
+                    if (!kb.isSafe(n)) {
+                        unsafeCount++;
+                        onlyUnsafe = n;
+                    }
+                }
+                if (unsafeCount != 1 || onlyUnsafe == null || kb.isDefiniteWumpus(onlyUnsafe)) {
+                    continue;
+                }
+                kb.markDefiniteWumpus(onlyUnsafe);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Breeze 칸 인접에 Pit 확정이 있고, 그 breeze의 "미해결" 이웃(안전·확정 pit 제외)이 하나뿐이면
+     * 그 이웃의 pit 후보만 제거한다(#39, 다중 pit).
+     * 인접에 pit 후보가 여러 개 남는 breeze(예: (3,3) breeze + (4,3)! 만으로 (3,4) 제거)는 건드리지 않는다.
+     */
+    private boolean applyDefinitePitExplainsAdjacentBreeze(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position b = new Position(x, y);
+                if (!kb.isVisited(b) || !kb.getCellBelief(b).lastPercept().isBreeze()) {
+                    continue;
+                }
+                boolean hasDefinitePitNeighbor = false;
+                for (Position n : neighbors(b)) {
+                    if (kb.isValid(n) && kb.isDefinitePit(n)) {
+                        hasDefinitePitNeighbor = true;
+                        break;
+                    }
+                }
+                if (!hasDefinitePitNeighbor) {
+                    continue;
+                }
+                Position soleOpenNeighbor = null;
+                int openCount = 0;
+                for (Position m : neighbors(b)) {
+                    if (!kb.isValid(m) || kb.isSafe(m) || kb.isDefinitePit(m)) {
+                        continue;
+                    }
+                    openCount++;
+                    soleOpenNeighbor = m;
+                }
+                if (openCount != 1 || soleOpenNeighbor == null) {
+                    continue;
+                }
+                if (kb.isPossiblePit(soleOpenNeighbor)) {
+                    kb.setPossiblePit(soleOpenNeighbor, false);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Stench 칸 인접에 Wumpus 확정이 있고, 미해결 이웃이 하나뿐이면 그 이웃의 wumpus 후보만 제거한다(#39, 다중 wumpus).
+     */
+    private boolean applyDefiniteWumpusExplainsAdjacentStench(KnowledgeBase kb) {
+        boolean changed = false;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position s = new Position(x, y);
+                if (!kb.isVisited(s) || !kb.getCellBelief(s).lastPercept().isStench()) {
+                    continue;
+                }
+                boolean hasDefiniteWumpusNeighbor = false;
+                for (Position n : neighbors(s)) {
+                    if (kb.isValid(n) && kb.isDefiniteWumpus(n)) {
+                        hasDefiniteWumpusNeighbor = true;
+                        break;
+                    }
+                }
+                if (!hasDefiniteWumpusNeighbor) {
+                    continue;
+                }
+                Position soleOpenNeighbor = null;
+                int openCount = 0;
+                for (Position m : neighbors(s)) {
+                    if (!kb.isValid(m) || kb.isSafe(m) || kb.isDefiniteWumpus(m)) {
+                        continue;
+                    }
+                    openCount++;
+                    soleOpenNeighbor = m;
+                }
+                if (openCount != 1 || soleOpenNeighbor == null) {
+                    continue;
+                }
+                if (kb.isPossibleWumpus(soleOpenNeighbor)) {
+                    kb.setPossibleWumpus(soleOpenNeighbor, false);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
     /** Pit으로 확정된 칸은 wumpus 후보에서 제거한다(#34). */
     private boolean applyConfirmedPitClearsWumpusCandidate(KnowledgeBase kb) {
         boolean changed = false;
@@ -340,7 +585,10 @@ public class RuleEngineService {
         return changed;
     }
 
-    /** pit·wumpus 후보가 모두 없으면 해당 칸을 안전으로 확정한다. */
+    /**
+     * pit·wumpus 후보가 모두 없고, 인접에 방문된(=무풍·무악취가 정리해 준) 칸이 적어도 하나 있으면 안전으로 확정한다(#39).
+     * prior가 빈 상태에서는 "후보 없음"이 곧 "정보 없음"과 같으므로, 관측 근거가 닿은 칸만 safe로 본다.
+     */
     private boolean applyCandidateFreeCellsAsSafe(KnowledgeBase kb) {
         boolean changed = false;
         for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
@@ -349,13 +597,69 @@ public class RuleEngineService {
                 if (!kb.isValid(p) || kb.isSafe(p)) {
                     continue;
                 }
-                if (!kb.isPossiblePit(p) && !kb.isPossibleWumpus(p)) {
-                    kb.markDefinitelySafe(p);
-                    changed = true;
+                if (kb.isPossiblePit(p) || kb.isPossibleWumpus(p)) {
+                    continue;
                 }
+                if (mayStillHidePitOrWumpusFromAdjacentBreezeOrStench(kb, p)) {
+                    continue;
+                }
+                boolean hasVisitedNeighbor = false;
+                for (Position n : neighbors(p)) {
+                    if (kb.isValid(n) && kb.isVisited(n)) {
+                        hasVisitedNeighbor = true;
+                        break;
+                    }
+                }
+                if (!hasVisitedNeighbor) {
+                    continue;
+                }
+                kb.markDefinitelySafe(p);
+                changed = true;
             }
         }
         return changed;
+    }
+
+    /**
+     * breeze/stench 칸 옆에 아직 "미해결" 이웃(안전·확정 제외)이 하나 더 있으면,
+     * 후보 없음만으로 safe 처리하면 안 된다(#39, 다중 pit/wumpus).
+     */
+    private static boolean mayStillHidePitOrWumpusFromAdjacentBreezeOrStench(KnowledgeBase kb, Position p) {
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position observed = new Position(x, y);
+                if (!kb.isVisited(observed)) {
+                    continue;
+                }
+                boolean breeze = kb.getCellBelief(observed).lastPercept().isBreeze();
+                boolean stench = kb.getCellBelief(observed).lastPercept().isStench();
+                if (!breeze && !stench) {
+                    continue;
+                }
+                if (!isNeighborOf(observed, p)) {
+                    continue;
+                }
+                for (Position other : neighbors(observed)) {
+                    if (other.equals(p)) {
+                        continue;
+                    }
+                    if (!kb.isValid(other) || kb.isSafe(other)) {
+                        continue;
+                    }
+                    if (breeze && !kb.isDefinitePit(other)) {
+                        return true;
+                    }
+                    if (stench && kb.isWumpusAlive() && !kb.isDefiniteWumpus(other)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isNeighborOf(Position center, Position candidate) {
+        return neighbors(center).contains(candidate);
     }
 
     /** 4×4 격자에서 상하좌우 인접 좌표만 반환한다. */

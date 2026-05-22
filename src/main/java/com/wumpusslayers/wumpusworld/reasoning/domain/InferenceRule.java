@@ -21,6 +21,12 @@ public enum InferenceRule {
      */
     BREEZE_PIT_SINGLETON_NARROWS_NEIGHBORS(35),
 
+    /**
+     * Breeze 칸의 인접 중 안전이 아닌 칸이 하나뿐이면 그 칸을 Pit으로 확정한다(#39).
+     * “인접이 전부 safe면 pit은 그 한 칸”과 동일한 국소 논리다.
+     */
+    BREEZE_UNIQUE_UNSAFE_NEIGHBOR_IDENTIFIES_PIT(36),
+
     /** 방문한 칸에 Stench가 있으면, 인접 칸에 wumpus 후보 표시(#13) */
     STENCH_MARK_WUMPUS_CANDIDATES(40),
 
@@ -29,6 +35,12 @@ public enum InferenceRule {
      * 다중 움퍼스 환경에서도 “그 stench를 설명할 수 있는 인접”만 좁히는 보수적 규칙이다.
      */
     STENCH_WUMPUS_SINGLETON_NARROWS_NEIGHBORS(45),
+
+    /**
+     * Stench 칸의 인접 중 안전이 아닌 칸이 하나뿐이면 그 칸을 Wumpus로 확정한다(#39).
+     * “인접이 전부 safe면 움퍼스는 그 한 칸”과 동일한 국소 논리다.
+     */
+    STENCH_UNIQUE_UNSAFE_NEIGHBOR_IDENTIFIES_WUMPUS(46),
 
     /**
      * {@link KnowledgeBase#isWumpusAlive()} 가 false일 때 전 격자에서 움퍼스 후보를 제거한다.
@@ -42,6 +54,18 @@ public enum InferenceRule {
      * 움퍼스가 있을 수 없으므로 {@code possibleWumpus}를 false로 만든다(#34, 상호 배제).
      */
     CONFIRMED_PIT_CLEARS_WUMPUS_CANDIDATE(60),
+
+    /**
+     * Breeze 칸 인접에 Pit 확정 칸이 있으면, 그 breeze는 이미 설명된 것이므로
+     * 같은 인접의 나머지 칸 pit 후보를 제거한다(#34·#39).
+     */
+    DEFINITE_PIT_EXPLAINS_BREEZE(65),
+
+    /**
+     * Stench 칸 인접에 Wumpus 확정 칸이 있으면, 그 stench는 이미 설명된 것이므로
+     * 같은 인접의 나머지 칸 wumpus 후보를 제거한다(#37·#39).
+     */
+    DEFINITE_WUMPUS_EXPLAINS_STENCH(68),
 
     /**
      * {@link KnowledgeBase#isDefiniteWumpus(com.wumpusslayers.wumpusworld.environment.domain.Position)} 인 칸은

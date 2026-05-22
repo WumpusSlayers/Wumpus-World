@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class KnowledgeBaseTest {
 
     @Test
-    @DisplayName("(1,1)은 안전이며 pit/wumpus 후보가 아니고, 나머지 칸은 후보로 시작한다.")
+    @DisplayName("(1,1)은 안전이며, 미관측 칸의 pit/wumpus 후보는 비어 있다(#39).")
     void initialBeliefMatchesStartCellAssumptions() {
         KnowledgeBase kb = new KnowledgeBase();
 
@@ -19,11 +19,25 @@ class KnowledgeBaseTest {
         assertFalse(kb.isPossiblePit(new Position(1, 1)));
         assertFalse(kb.isPossibleWumpus(new Position(1, 1)));
 
-        assertTrue(kb.isPossiblePit(new Position(4, 4)));
-        assertTrue(kb.isPossibleWumpus(new Position(2, 3)));
+        assertFalse(kb.isPossiblePit(new Position(4, 4)));
+        assertFalse(kb.isPossibleWumpus(new Position(2, 3)));
         assertFalse(kb.isVisited(new Position(2, 2)));
         assertTrue(kb.isWumpusAlive());
         assertFalse(kb.isHeardScream());
+    }
+
+    @Test
+    @DisplayName("초기 prior는 비어 있다: 모든 칸 possiblePit/Wumpus가 false다(#39).")
+    void initialPriorIsEmpty() {
+        KnowledgeBase kb = new KnowledgeBase();
+
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position pos = new Position(x, y);
+                assertFalse(kb.isPossiblePit(pos), "possiblePit at " + pos);
+                assertFalse(kb.isPossibleWumpus(pos), "possibleWumpus at " + pos);
+            }
+        }
     }
 
     @Test

@@ -10,6 +10,8 @@ import java.util.Objects;
 /**
  * 4×4 월드에 대한 에이전트 지식(관측 스냅샷 + 안전/후보 집합).
  * 환경의 숨겨진 진실({@code World}/{@code Grid})은 읽지 않는다(#12 이후 observe 파이프라인).
+ * 초기 prior는 "미지 = 후보 없음"으로, (1,1)만 safe이고 그 외 칸의 {@code possiblePit}/{@code possibleWumpus}는 false다.
+ * 후보는 시뮬이 percept를 흘려주면 {@link com.wumpusslayers.wumpusworld.reasoning.service.RuleEngineService}가 신호 칸의 인접에만 켠다(#13·#39).
  * 사망 직전까지 쌓인 지식을 유지할지 여부는 호출 측 생명주기(#15)에서 결정하며, 유지 시에는 {@link #clear()}를 호출하지 않는다.
  */
 public final class KnowledgeBase {
@@ -42,16 +44,16 @@ public final class KnowledgeBase {
             for (int y = 0; y < GRID_SIZE; y++) {
                 cells[x][y] = CellBelief.unseen();
                 safe[x][y] = false;
-                possiblePit[x][y] = true;
-                possibleWumpus[x][y] = true;
+                // 신호(breeze/stench) 관측 전에는 후보를 깔지 않는다(#39).
+                // breeze/stench가 들어오면 RuleEngineService의 인접 등록 룰(#13)이 켠다.
+                possiblePit[x][y] = false;
+                possibleWumpus[x][y] = false;
                 definitePit[x][y] = false;
                 definiteWumpus[x][y] = false;
             }
         }
         // (1,1) 시작 칸은 안전으로 가정(제안서·환경 규칙과 정합)
         safe[0][0] = true;
-        possiblePit[0][0] = false;
-        possibleWumpus[0][0] = false;
 
         this.wumpusAlive = true;
         this.heardScream = false;
