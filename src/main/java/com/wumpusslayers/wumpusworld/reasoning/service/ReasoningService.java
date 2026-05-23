@@ -81,6 +81,27 @@ public class ReasoningService {
     }
 
     /**
+     * 화살이 빗나간 경로상 칸들의 Wumpus 후보를 제거하고,
+     * 인접에 breeze 감지 칸이 없으면 safe로 확정한다.
+     */
+    public void markArrowMissPath(String sessionId, List<Position> path, KnowledgeBase kb) {
+        requireSessionId(sessionId);
+        if (path == null || path.isEmpty() || kb == null) {
+            return;
+        }
+        for (Position pos : path) {
+            System.out.println("[DEBUG] 처리 중: " + pos + " | possibleWumpus: " + kb.isPossibleWumpus(pos));
+            /** 화살 통과 칸 영구 표시 — stench 규칙에서 재등록 방지 */
+            kb.setArrowCleared(pos);
+            /** 화살 경로상 Wumpus 후보 제거 */
+            if (kb.isPossibleWumpus(pos)) {
+                kb.setPossibleWumpus(pos, false);
+            }
+        }
+        ruleEngineService.runInference(kb);
+    }
+
+    /**
      * 현재 KB에 대해 규칙 엔진만 다시 적용한다. KB가 없으면 아무 것도 하지 않는다.
      */
     public void runInference(String sessionId) {

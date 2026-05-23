@@ -62,7 +62,8 @@ public class GameEngine {
             throw new SimulationException("진행 중인 게임이 없습니다.");
         }
 
-        Action result = actionPlannerService.executeAction(world, actionType);
+        // executeAction에 userId 추가
+        Action result = actionPlannerService.executeAction(world, actionType, userId);
         if (result.isDiedInPit() && result.getActionPosition() != null) {
             reasoningService.markAgentDiedInPit(userId, result.getActionPosition());
         }

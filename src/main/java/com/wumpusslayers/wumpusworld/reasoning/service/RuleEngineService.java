@@ -248,6 +248,10 @@ public class RuleEngineService {
                     if (isRuledOutAsWumpusByNoStenchAtAdjacentVisitedCell(kb, n)) {
                         continue;
                     }
+                    // 화살 통과로 Wumpus 없음이 확인된 칸은 후보 등록 제외
+                    if (kb.isArrowCleared(n)) {
+                        continue;
+                    }
                     if (!kb.isPossibleWumpus(n)) {
                         kb.setPossibleWumpus(n, true);
                         changed = true;
@@ -620,6 +624,11 @@ public class RuleEngineService {
         return changed;
     }
 
+
+    /** 화살 경로 safe 판단용. 인접에 breeze 감지 칸 있으면 true. */
+    public boolean mayStillHidePit(KnowledgeBase kb, Position pos) {
+        return mayStillHidePitOrWumpusFromAdjacentBreezeOrStench(kb, pos);
+    }
     /**
      * breeze/stench 칸 옆에 아직 "미해결" 이웃(안전·확정 제외)이 하나 더 있으면,
      * 후보 없음만으로 safe 처리하면 안 된다(#39, 다중 pit/wumpus).
@@ -638,6 +647,15 @@ public class RuleEngineService {
                 }
                 if (!isNeighborOf(observed, p)) {
                     continue;
+                }
+                // observed 칸에서 stench/breeze가 감지됐고 p가 그 이웃이면,
+                // 다른 이웃이 확정됐더라도 p 자체가 Wumpus/Pit의 원인일 수 있다.
+                // 다중 Wumpus/Pit 환경에서는 p를 safe로 확정하면 안 된다.
+                if (stench && kb.isWumpusAlive() && !kb.isDefiniteWumpus(p)) {
+                    return true;
+                }
+                if (breeze && !kb.isDefinitePit(p)) {
+                    return true;
                 }
                 for (Position other : neighbors(observed)) {
                     if (other.equals(p)) {

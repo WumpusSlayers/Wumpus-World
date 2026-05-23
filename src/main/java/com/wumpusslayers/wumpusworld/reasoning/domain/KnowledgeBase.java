@@ -24,6 +24,8 @@ public final class KnowledgeBase {
     private final boolean[][] possibleWumpus;
     private final boolean[][] definitePit;
     private final boolean[][] definiteWumpus;
+    /** 화살이 통과하여 Wumpus가 없음이 확인된 칸. stench 규칙에서 후보 재등록 방지용. */
+    private boolean[][] arrowCleared;
 
     private boolean wumpusAlive;
     private boolean heardScream;
@@ -36,6 +38,8 @@ public final class KnowledgeBase {
         this.possibleWumpus = new boolean[GRID_SIZE][GRID_SIZE];
         this.definitePit = new boolean[GRID_SIZE][GRID_SIZE];
         this.definiteWumpus = new boolean[GRID_SIZE][GRID_SIZE];
+        /** 화살 통과 칸 초기화 */
+        this.arrowCleared = new boolean[GRID_SIZE][GRID_SIZE];
         initializeState();
     }
 
@@ -224,6 +228,16 @@ public final class KnowledgeBase {
         int xi = toIndexX(pos);
         int yi = toIndexY(pos);
         return possibleWumpus[xi][yi];
+    }
+
+    /** 해당 칸이 화살 통과로 Wumpus 없음이 확인됐는지 반환한다. */
+    public boolean isArrowCleared(Position pos) {
+        return arrowCleared[toIndexX(pos)][toIndexY(pos)];
+    }
+
+    /** 화살 통과로 Wumpus 없음이 확인된 칸으로 표시한다. */
+    public void setArrowCleared(Position pos) {
+        arrowCleared[toIndexX(pos)][toIndexY(pos)] = true;
     }
 
     /** 해당 칸이 Pit으로 100% 확정되었는지. */
