@@ -83,15 +83,23 @@ public class ActionPlannerService {
                 System.out.println("후보군 수: " + wumpusCandidates.size());
 
                 if (wumpusCandidates.size() == 2) {
-                    if (Math.random() < 0.5) {
+                        // 후보 2개 중 랜덤으로 타겟 선택
+                        Position target = wumpusCandidates.get((int)(Math.random() * 2));
+                        // 타겟 방향으로 에이전트 회전
+                        Direction shootDir = getDirectionToTarget(world.getAgentPosition(), target);
+
+                        // 타겟 방향으로 실제 회전 적용
+                        if (shootDir != null) {
+                            world.setAgentDirection(shootDir);
+                        }
+
                         screamed = shootArrow(world, sessionId, kb);
+                        System.out.println("선택된 타겟: " + target);
+                        System.out.println("발사 방향: " + shootDir);
                         System.out.println("남은 화살 수: " + world.getArrowCount());
                         message = screamed
                                 ? "화살이 Wumpus에 명중했습니다!"
                                 : "화살이 빗나갔습니다.";
-                    } else {
-                        message = "발사하지 않기로 결정했습니다.";
-                    }
                 } else {
                     message = "Wumpus 후보군이 2개가 아닙니다.";
                 }
@@ -233,5 +241,17 @@ public class ActionPlannerService {
             reasoningService.markArrowMissPath(sessionId, missedPath, kb);
         }
         return false;
+    }
+
+    /**
+     * 현재 위치에서 타겟 위치 방향을 반환한다.
+     * 같은 행/열이 아니면 null 반환 (직선 방향만 지원, 대각선에 위치한 경우는 X)
+     */
+    private Direction getDirectionToTarget(Position current, Position target) {
+        if (target.getX() > current.getX()) return Direction.EAST;
+        if (target.getX() < current.getX()) return Direction.WEST;
+        if (target.getY() > current.getY()) return Direction.NORTH;
+        if (target.getY() < current.getY()) return Direction.SOUTH;
+        return null;
     }
 }
