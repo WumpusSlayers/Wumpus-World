@@ -13,6 +13,8 @@ import com.wumpusslayers.wumpusworld.environment.service.WorldGeneratorService;
 import com.wumpusslayers.wumpusworld.reasoning.service.ReasoningService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.wumpusslayers.wumpusworld.agent.service.PathFinderService;
+import com.wumpusslayers.wumpusworld.environment.domain.Position;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,6 +30,7 @@ public class GameEngine {
     private final ActionPlannerService actionPlannerService;
     private final PerceptService perceptService;
     private final ReasoningService reasoningService;
+    private final PathFinderService pathFinderService;
 
     // 여러 사용자가 접속할 수 있으므로 메모리에 게임 상태 저장 (Key: 세션ID 또는 유저명)
     private final ConcurrentHashMap<String, World> gameSessions = new ConcurrentHashMap<>();
@@ -48,6 +51,13 @@ public class GameEngine {
 
         System.out.println("새로운 게임 시작! 유저: " + userId);
         System.out.println(world.toString());
+
+        Position recommended = pathFinderService.selectNextCell(userId, world.getAgentPosition());
+        System.out.println("---------- [PathFinder] ----------");
+        System.out.println("현재 위치: " + world.getAgentPosition());
+        System.out.println("다음 추천 셀: " + recommended);
+        System.out.println("----------------------------------");
+
         return world;
     }
 
@@ -75,6 +85,15 @@ public class GameEngine {
 
         System.out.println("액션 실행: " + actionType + " | 결과: " + result.getMessage());
         System.out.println(world.toString());
+
+        // GO_FORWARD 후 PathFinder 다음 추천 셀 로그
+        if (actionType == ActionType.GO_FORWARD) {
+            Position recommended = pathFinderService.selectNextCell(userId, world.getAgentPosition());
+            System.out.println("---------- [PathFinder] ----------");
+            System.out.println("현재 위치: " + world.getAgentPosition());
+            System.out.println("다음 추천 셀: " + recommended);
+            System.out.println("----------------------------------");
+        }
 
         return result;
     }

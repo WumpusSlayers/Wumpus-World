@@ -322,7 +322,8 @@ public final class KnowledgeBase {
             }
             System.out.println(row.toString());
         }
-        System.out.println("범례 - V:방문, S:안전, P:pit후보, !:pit확정, W:wumpus후보, @:wumpus확정");
+        // KB 스냅샷 범례: S=추론 기반 안전, VS=방문+안전확정으로 구분
+        System.out.println("범례 - V:방문, S:안전추론, VS:방문+안전확정, P:pit후보, !:pit확정, W:wumpus후보, @:wumpus확정");
         System.out.println("==================================================");
     }
 }
