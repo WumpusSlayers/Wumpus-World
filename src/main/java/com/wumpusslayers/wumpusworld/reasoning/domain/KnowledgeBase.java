@@ -99,6 +99,15 @@ public final class KnowledgeBase {
         possibleWumpus[xi][yi] = false;
     }
 
+    /** 확정 Wumpus 칸 명중 후 safe 처리 (definiteWumpus 해제 후 safe 처리) */
+    public void clearDefiniteWumpusAndMarkSafe(Position pos) {
+        int xi = toIndexX(pos);
+        int yi = toIndexY(pos);
+        definiteWumpus[xi][yi] = false;
+        possibleWumpus[xi][yi] = false;
+        safe[xi][yi] = true;
+    }
+
     /**
      * 해당 칸을 Pit으로 확정한다(예: 에이전트가 그 칸에서 사망). 안전·Wumpus 확정 칸이면 예외.
      * possiblePit은 true, possibleWumpus는 false로 정합한다(#34).
