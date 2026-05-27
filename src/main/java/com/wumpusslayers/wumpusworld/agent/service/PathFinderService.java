@@ -8,6 +8,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Queue;
 
 @Service
 @RequiredArgsConstructor
@@ -67,6 +71,66 @@ public class PathFinderService {
         }
 
         return null;
+    }
+
+    /**
+     * Gold 획득 후 현재 위치에서 (1,1)까지 BFS 기반 최단 경로를 계산한다.
+     * Safe 방문 칸을 경유하며, Pit/Wumpus 확정 칸은 경로에서 제외한다.
+     * 경로가 없으면 빈 리스트를 반환한다.
+     */
+    public List<Position> buildSafeReturnPath(String sessionId, Position current) {
+        KnowledgeBase kb = knowledgeUpdateService.getKnowledgeBaseOrNull(sessionId);
+        if (kb == null) return new ArrayList<>();
+
+        Position goal = new Position(1, 1);
+
+        // 이미 (1,1)에 있으면 빈 리스트 반환
+        if (current.equals(goal)) return new ArrayList<>();
+
+        // BFS 탐색
+        Queue<Position> queue = new LinkedList<>();
+        Map<Position, Position> parentMap = new HashMap<>();
+
+        queue.add(current);
+        parentMap.put(current, null);
+
+        while (!queue.isEmpty()) {
+            Position now = queue.poll();
+
+            for (Position next : getNeighbors(now)) {
+                if (!isValid(next) || parentMap.containsKey(next)) continue;
+                // Pit/Wumpus 확정 칸은 경로 제외
+                if (kb.isDefinitePit(next) || kb.isDefiniteWumpus(next)) continue;
+                // Safe 칸만 경유 가능
+                if (!kb.isSafe(next)) continue;
+
+                parentMap.put(next, now);
+
+                // 목표 도달
+                if (next.equals(goal)) {
+                    return reconstructPath(parentMap, current, goal);
+                }
+
+                queue.add(next);
+            }
+        }
+
+        return new ArrayList<>();
+    }
+
+    /**
+     * parentMap을 역추적하여 start에서 goal까지의 경로를 반환한다.
+     */
+    private List<Position> reconstructPath(Map<Position, Position> parentMap, Position start, Position goal) {
+        List<Position> path = new ArrayList<>();
+        Position current = goal;
+
+        while (!current.equals(start)) {
+            path.add(0, current);
+            current = parentMap.get(current);
+        }
+
+        return path;
     }
 
     /**
