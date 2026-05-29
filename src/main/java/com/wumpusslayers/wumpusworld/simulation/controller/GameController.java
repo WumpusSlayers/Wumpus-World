@@ -9,8 +9,10 @@ import com.wumpusslayers.wumpusworld.environment.domain.World;
 import com.wumpusslayers.wumpusworld.reasoning.dto.response.KnowledgeSummaryResponse;
 import com.wumpusslayers.wumpusworld.reasoning.service.ReasoningService;
 import com.wumpusslayers.wumpusworld.simulation.service.GameEngine;
+import com.wumpusslayers.wumpusworld.agent.domain.Action;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/game")
@@ -53,5 +55,23 @@ public class GameController {
     @GetMapping("/reasoning/summary")
     public KnowledgeSummaryResponse getReasoningSummary(@RequestParam String userId) {
         return reasoningService.getKnowledgeSummary(userId);
+    }
+
+    /*
+     * 에이전트 자동 행동 API
+     * POST /api/game/auto?userId=..
+     */
+    @PostMapping("/auto")
+    public Action autoAction(@RequestParam String userId) {
+        return gameEngine.processAutoAction(userId);
+    }
+
+    /*
+     * 게임 종료까지 AgentService가 자동으로 실행하는 API
+     * POST /api/game/run?userId=..
+     */
+    @PostMapping("/run")
+    public List<Action> runGame(@RequestParam String userId) {
+        return gameEngine.runAutoGame(userId);
     }
 }

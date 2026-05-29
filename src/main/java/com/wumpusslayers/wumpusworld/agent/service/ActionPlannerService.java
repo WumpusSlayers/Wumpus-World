@@ -255,7 +255,10 @@ public class ActionPlannerService {
             if (cell.isHasWumpus() && (kb == null || !kb.isDefiniteWumpus(pos))) {
                 cell.setHasWumpus(false);
                 world.setWumpusAlive(world.hasAnyWumpusOnGrid());
-                if (kb != null) kb.setPossibleWumpus(pos, false);
+                if (kb != null) {
+                    kb.setArrowCleared(pos);
+                    kb.setPossibleWumpus(pos, false);
+                }
                 return true;
             }
 
@@ -263,7 +266,10 @@ public class ActionPlannerService {
             if (cell.isHasWumpus()) {
                 cell.setHasWumpus(false);
                 world.setWumpusAlive(world.hasAnyWumpusOnGrid());
-                if (kb != null) kb.clearDefiniteWumpusAndMarkSafe(pos);
+                if (kb != null) {
+                    kb.setArrowCleared(pos); // ← 추가
+                    kb.clearDefiniteWumpusAndMarkSafe(pos);
+                }
                 return true;
             }
             x += dx;

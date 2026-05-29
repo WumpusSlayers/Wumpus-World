@@ -233,7 +233,7 @@ public class RuleEngineService {
                 }
                 boolean stenchExplainedByDefiniteWumpus = false;
                 for (Position n : neighbors(p)) {
-                    if (kb.isValid(n) && kb.isDefiniteWumpus(n)) {
+                    if (kb.isValid(n) && (kb.isDefiniteWumpus(n) || kb.isArrowCleared(n))) {
                         stenchExplainedByDefiniteWumpus = true;
                         break;
                     }
@@ -444,7 +444,7 @@ public class RuleEngineService {
                 }
                 boolean stenchExplainedByDefiniteWumpus = false;
                 for (Position n : neighbors(s)) {
-                    if (kb.isValid(n) && kb.isDefiniteWumpus(n)) {
+                    if (kb.isValid(n) && (kb.isDefiniteWumpus(n) || kb.isArrowCleared(n))) {
                         stenchExplainedByDefiniteWumpus = true;
                         break;
                     }
@@ -458,7 +458,7 @@ public class RuleEngineService {
                     if (!kb.isValid(n) || kb.isDefinitePit(n) || kb.isDefiniteWumpus(n)) {
                         continue;
                     }
-                    if (!kb.isSafe(n)) {
+                    if (!kb.isSafe(n) && kb.isPossibleWumpus(n)) {
                         unsafeCount++;
                         onlyUnsafe = n;
                     }

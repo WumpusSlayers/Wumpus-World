@@ -90,6 +90,7 @@ public class ReasoningService {
             return;
         }
         for (Position pos : path) {
+            if (kb.isDefiniteWumpus(pos)) continue;
             System.out.println("[DEBUG] 처리 중: " + pos + " | possibleWumpus: " + kb.isPossibleWumpus(pos));
             /** 화살 통과 칸 영구 표시 — stench 규칙에서 재등록 방지 */
             kb.setArrowCleared(pos);
