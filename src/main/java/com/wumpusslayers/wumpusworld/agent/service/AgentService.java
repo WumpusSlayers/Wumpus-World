@@ -8,6 +8,7 @@ import com.wumpusslayers.wumpusworld.common.enums.Direction;
 import com.wumpusslayers.wumpusworld.environment.domain.World;
 import com.wumpusslayers.wumpusworld.reasoning.domain.KnowledgeBase;
 import com.wumpusslayers.wumpusworld.reasoning.service.KnowledgeUpdateService;
+import com.wumpusslayers.wumpusworld.common.enums.GameStatus;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -52,7 +53,16 @@ public class AgentService {
             System.out.println("[AgentService] (1,1) 도착 → CLIMB 실행");
             return ActionType.CLIMB;
         }
+
         return null;
+    }
+
+    /**
+     * 세션 종료 시 이전 위치 정보를 제거한다.
+     * 새 게임 시작 시 호출하여 이전 세션 데이터 정리.
+     */
+    public void clearSession(String sessionId) {
+        previousPositions.remove(sessionId);
     }
 
     /**
@@ -68,7 +78,7 @@ public class AgentService {
         }
 
         // 2. Gold 보유 → 복귀 모드
-        if (world.getStatus().name().equals("WIN")) {
+        if (world.getStatus() == GameStatus.WIN) {
             // (1,1) 도착 시 CLIMB
             ActionType climb = completeMission(current);
             if (climb != null) return climb;
@@ -78,6 +88,9 @@ public class AgentService {
             Position nextStep = getNextReturnStep(returnPath);
             if (nextStep != null) {
                 return getActionToMove(world, nextStep);
+            } else {
+                //예외를 던지지 않고, 로그만 남겨서 아래 3번(SHOOT)이나 4번(PathFinder) 로직으로 넘어가게 합니다.
+                System.err.printf("[WARN] 세션 %s: 복귀 경로의 다음 단계가 결정되지 않아 일반 탐색/전투 모드로 전환합니다. (현재 위치: %s)%n", sessionId, current);
             }
         }
 
@@ -92,9 +105,15 @@ public class AgentService {
         if (nextCell != null) {
             previousPositions.put(sessionId, current); // 현재 위치를 이전 위치로 저장
             return getActionToMove(world, nextCell);
+        } else {
+            //다음 셀이 없으면 로그만 남기고 최하단 에러 처리로 가게 둠
+            System.err.printf("[WARN] 세션 %s: PathFinder가 다음 셀을 선택하지 못했습니다. (현재 위치: %s)%n", sessionId, current);
         }
 
-        return null;
+        //null이 반환되던 최종 구멍을 로그와 예외로 차단
+        String errorMsg = String.format("[CRITICAL ERROR] 세션 %s: 에이전트가 어떤 행동도 결정하지 못했습니다. (현재 위치: %s)", sessionId, current);
+        System.err.println(errorMsg);
+        throw new IllegalStateException(errorMsg);
     }
 
     /**
@@ -104,7 +123,12 @@ public class AgentService {
     private ActionType getActionToMove(World world, Position target) {
         Position current = world.getAgentPosition();
         Direction targetDir = getDirectionTo(current, target);
-        if (targetDir == null) return null;
+        // 예외 처리로 변경
+        if (targetDir == null) {
+            String errorMsg = String.format("[ERROR] 방향 계산 실패로 이동 액션을 결정할 수 없습니다. (현재: %s -> 목표: %s)", current, target);
+            System.err.println(errorMsg);
+            throw new IllegalArgumentException(errorMsg);
+        }
 
         Direction currentDir = world.getAgentDirection();
         if (currentDir == targetDir) return ActionType.GO_FORWARD;
@@ -120,26 +144,43 @@ public class AgentService {
         if (target.getX() < current.getX()) return Direction.WEST;
         if (target.getY() > current.getY()) return Direction.NORTH;
         if (target.getY() < current.getY()) return Direction.SOUTH;
-        return null;
+        //제자리 등 방향 계산 불가 시 로그 찍고 예외 발생
+        String errorMsg = String.format("[WARN] 현재 위치와 목표 위치가 동일하거나 방향이 올바르지 않습니다. (현재: %s, 목표: %s)", current, target);
+        System.err.println(errorMsg);
+        throw new IllegalArgumentException(errorMsg);
     }
 
     /**
-     * 현재 위치에서 직선 방향에 확정/후보 Wumpus가 있으면 true 반환
+     * 인접 4방향에 확정/후보 Wumpus가 있으면 true 반환
+     * 화살은 직선으로 날아가므로 더 먼 거리의 Wumpus도 명중 가능
      */
+    // 인접에 Wumpus 있고 전체 후보/확정이 1~2개일 때만 SHOOT
     private boolean hasShootableWumpus(String sessionId, World world) {
         KnowledgeBase kb = knowledgeUpdateService.getKnowledgeBaseOrNull(sessionId);
         if (kb == null) return false;
 
         Position current = world.getAgentPosition();
-        List<Position> neighbors = getNeighbors(current);
 
-        for (Position pos : neighbors) {
+        // 인접 체크
+        boolean hasAdjacentWumpus = false;
+        for (Position pos : getNeighbors(current)) {
             if (!isValid(pos)) continue;
-            if (kb.isDefiniteWumpus(pos) || (kb.isPossibleWumpus(pos) && !kb.isDefiniteWumpus(pos))) {
-                return true;
+            if (kb.isDefiniteWumpus(pos) || kb.isPossibleWumpus(pos)) {
+                hasAdjacentWumpus = true;
+                break;
             }
         }
-        return false;
+        if (!hasAdjacentWumpus) return false;
+
+        // 전체 후보/확정 수 체크
+        long totalCount = 0;
+        for (int x = 1; x <= 4; x++) {
+            for (int y = 1; y <= 4; y++) {
+                Position p = new Position(x, y);
+                if (kb.isDefiniteWumpus(p) || kb.isPossibleWumpus(p)) totalCount++;
+            }
+        }
+        return totalCount <= 2;
     }
 
     /**

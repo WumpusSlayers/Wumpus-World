@@ -47,6 +47,8 @@ public class GameEngine {
     public World startNewGame(String userId) {
         requireUserId(userId);
         reasoningService.resetKnowledgeForNewGame(userId);
+        //이전 세션 데이터 정리
+        agentService.clearSession(userId);
         World world = worldGeneratorService.generateWorld();
         gameSessions.put(userId, world);
 
@@ -130,8 +132,8 @@ public class GameEngine {
         List<Action> actions = new ArrayList<>();
         World world = gameSessions.get(userId);
 
-        while (world != null && world.getStatus() == GameStatus.PLAYING
-                || world.getStatus() == GameStatus.WIN) {
+        while (world != null && (world.getStatus() == GameStatus.PLAYING
+                || world.getStatus() == GameStatus.WIN)) {
             Action action = processAutoAction(userId);
             actions.add(action);
             world = gameSessions.get(userId);

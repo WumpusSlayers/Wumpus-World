@@ -34,34 +34,69 @@ public class PathFinderService {
         if (kb == null) return null;
 
         List<Position> neighbors = getNeighbors(current);
-        Position backtrackCandidate = null;
 
-        // 1순위: 인접 Safe 미방문
+        Position result;
+
+        result = findFirstPriority(neighbors, kb);
+        if (result != null) return result;
+
+        result = findSecondPriority(kb, current);
+        if (result != null) return result;
+
+        result = findThirdPriority(neighbors, kb);
+        if (result != null) return result;
+
+        result = findFourthPriority(neighbors, kb);
+        if (result != null) return result;
+
+        return findFallback(neighbors, kb, previous, current);
+    }
+
+    /**
+     * 1순위: 인접 Safe 미방문
+     * 안전하게 새로운 칸 탐색
+     */
+    private Position findFirstPriority(List<Position> neighbors, KnowledgeBase kb) {
         for (Position pos : neighbors) {
             if (isValid(pos) && kb.isSafe(pos) && !kb.isVisited(pos)) {
                 System.out.println("[PathFinder] 1순위: 안전한 미방문 칸 이동 -> " + pos);
                 return pos;
             }
         }
+        return null;
+    }
 
-        // 2순위: BFS로 가장 가까운 Safe 미방문 칸 탐색 (핑퐁 원천 차단)
+    /**
+     * 2순위: BFS로 가장 가까운 Safe 미방문 칸 탐색 (핑퐁 원천 차단)
+     */
+    private Position findSecondPriority(KnowledgeBase kb, Position current) {
         Position bfsNext = bfsFindNearestUnvisitedSafe(kb, current);
         if (bfsNext != null) {
             System.out.println("[PathFinder] 2순위 BFS: 가장 가까운 Safe 미방문 칸 탐색 → 다음 이동 칸 " + bfsNext);
-            return bfsNext;
         }
+        return bfsNext;
+    }
 
-        // 3순위: Unknown 공격적 진입 (확정 위험이 없는 순수 미개척지)
+    /**
+     * 3순위: Unknown 공격적 진입 (확정 위험이 없는 순수 미개척지)
+     * 확정 위험지역 절대 금지, Pit 후보조차 아닌 완전 청정 Unknown
+     */
+    private Position findThirdPriority(List<Position> neighbors, KnowledgeBase kb) {
         for (Position pos : neighbors) {
             if (isValid(pos) && !kb.isVisited(pos)
-                    && !kb.isDefinitePit(pos) && !kb.isDefiniteWumpus(pos) // 확정 위험지역 절대 금지
-                    && !kb.isPossiblePit(pos)) { // 그 와중에 Pit 후보조차 아닌 완전 청정 Unknown
+                    && !kb.isDefinitePit(pos) && !kb.isDefiniteWumpus(pos)
+                    && !kb.isPossiblePit(pos)) {
                 System.out.println("[PathFinder] 3순위: Unknown 공격적 진입 -> " + pos);
                 return pos;
             }
         }
+        return null;
+    }
 
-        // 4순위: Pit 후보 진입 (안전지대가 아예 없고, 3순위 청정 Unknown도 없을 때만)
+    /**
+     * 4순위: Pit 후보 진입 (안전지대가 아예 없고, 3순위 청정 Unknown도 없을 때만)
+     */
+    private Position findFourthPriority(List<Position> neighbors, KnowledgeBase kb) {
         for (Position pos : neighbors) {
             if (isValid(pos) && !kb.isVisited(pos)
                     && !kb.isDefinitePit(pos) && !kb.isDefiniteWumpus(pos)) {
@@ -69,26 +104,22 @@ public class PathFinderService {
                 return pos;
             }
         }
+        return null;
+    }
 
-        /*
-        // 5순위: 고립 시 BFS로 안전한 칸만 밟고 다른 안전구역으로 탈출 (핑퐁 차단)
-        Position bfsEscapeNext = bfsFindNearestUnvisitedSafe(kb, current);
-        if (bfsEscapeNext != null) {
-            System.out.println("[PathFinder] 5순위: 고립 상태 발생! BFS로 안전 구역 탈출 -> " + bfsEscapeNext);
-            return bfsEscapeNext;
-        }
-        */
-
-         // 최후의 보루: 안전한 칸으로 후퇴하되, 바로 직전 칸(previous)으로 되돌아가며 핑퐁 치는 것을 원천 차단!
+    /**
+     * 최후의 보루: 안전한 칸으로 후퇴하되, 바로 직전 칸(previous)으로 되돌아가며
+     * 핑퐁 치는 것을 원천 차단
+     */
+    private Position findFallback(List<Position> neighbors, KnowledgeBase kb, Position previous, Position current) {
         Position backup = null;
         for (Position pos : neighbors) {
             if (isValid(pos) && kb.isSafe(pos)) {
-                // 직전 칸(previous)이 아닌 '다른 안전한 방문 칸'이 주변에 있다면 거기로 먼저 후퇴
                 if (previous == null || !pos.equals(previous)) {
                     System.out.println("[PathFinder] 고립 발생! 다른 안전한 칸으로 후퇴 -> " + pos);
                     return pos;
                 }
-                backup = pos; // 사방이 다 막혀서 진짜 어쩔 수 없이 왔던 길로 가야 할 때만 백업으로 저장
+                backup = pos;
             }
         }
 
@@ -97,6 +128,7 @@ public class PathFinderService {
             return backup;
         }
 
+        System.out.println("[PathFinder] 완전히 고립됨. 탈출 불가능. 위치: " + current);
         return null;
     }
 
@@ -194,6 +226,7 @@ public class PathFinderService {
                 //queue.add(next);
             }
         }
+        System.out.println("[PathFinder] BFS: 탐색 가능한 미방문 칸 없음. 위치: " + start);
         return null;
     }
 
