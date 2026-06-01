@@ -16,6 +16,7 @@ import com.wumpusslayers.wumpusworld.reasoning.service.KnowledgeUpdateService;
 import com.wumpusslayers.wumpusworld.reasoning.service.ReasoningService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -199,22 +200,26 @@ public class ActionPlannerService {
     }
 
     /**
+     * KB에서 조건에 맞는 위치 목록을 반환한다.
+     */
+    private List<Position> findPositions(KnowledgeBase kb, Predicate<Position> condition) {
+        List<Position> result = new ArrayList<>();
+        if (kb == null) return result;
+        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
+            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
+                Position p = new Position(x, y);
+                if (condition.test(p)) result.add(p);
+            }
+        }
+        return result;
+    }
+
+    /**
      * KB에서 Wumpus 후보 위치 목록을 반환한다.
      * KB가 null이면 빈 리스트를 반환한다.
      */
     private List<Position> getWumpusCandidates(KnowledgeBase kb) {
-        List<Position> candidates = new ArrayList<>();
-        if (kb == null) return candidates;
-        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
-            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
-                Position p = new Position(x, y);
-                // 확정 칸 제외, 후보 칸만 포함
-                if (kb.isPossibleWumpus(p) && !kb.isDefiniteWumpus(p)) {
-                    candidates.add(p);
-                }
-            }
-        }
-        return candidates;
+        return findPositions(kb, p -> kb.isPossibleWumpus(p) && !kb.isDefiniteWumpus(p));
     }
 
     /**
@@ -222,17 +227,7 @@ public class ActionPlannerService {
      * KB가 null이면 빈 리스트를 반환한다.
      */
     private List<Position> getDefiniteWumpusList(KnowledgeBase kb) {
-        List<Position> definiteList = new ArrayList<>();
-        if (kb == null) return definiteList;
-        for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
-            for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
-                Position p = new Position(x, y);
-                if (kb.isDefiniteWumpus(p)) {
-                    definiteList.add(p);
-                }
-            }
-        }
-        return definiteList;
+        return findPositions(kb, kb::isDefiniteWumpus);
     }
 
     /**
@@ -255,7 +250,10 @@ public class ActionPlannerService {
             if (cell.isHasWumpus() && (kb == null || !kb.isDefiniteWumpus(pos))) {
                 cell.setHasWumpus(false);
                 world.setWumpusAlive(world.hasAnyWumpusOnGrid());
-                if (kb != null) kb.setPossibleWumpus(pos, false);
+                if (kb != null) {
+                    kb.setArrowCleared(pos);
+                    kb.setPossibleWumpus(pos, false);
+                }
                 return true;
             }
 
@@ -263,7 +261,10 @@ public class ActionPlannerService {
             if (cell.isHasWumpus()) {
                 cell.setHasWumpus(false);
                 world.setWumpusAlive(world.hasAnyWumpusOnGrid());
-                if (kb != null) kb.clearDefiniteWumpusAndMarkSafe(pos);
+                if (kb != null) {
+                    kb.setArrowCleared(pos); // ← 추가
+                    kb.clearDefiniteWumpusAndMarkSafe(pos);
+                }
                 return true;
             }
             x += dx;

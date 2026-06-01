@@ -22,54 +22,113 @@ public class PathFinderService {
 
     /**
      * 우선순위 기반으로 다음 이동할 셀을 선택한다.
-     * 1순위: Safe && 미방문 → 안전하게 새로운 칸 탐색
-     * 2순위: Safe && 방문함 → 갔던 곳으로 backtrack
-     * 3순위: Pit 후보 >= 2개인 셀 → 우회 불가 시 공격적 진입
-     * 4순위: Unknown → 정보 없는 칸 공격적 진입
+     * 1순위: Safe && 미방문 (인접) → 안전하게 새로운 칸 탐색
+     * 2순위: BFS → Safe 칸만 경유하여 가장 가까운 Safe 미방문 칸 탐색 (핑퐁 방지)
+     * 3순위: 완전 청정 Unknown (인접) → Pit/Wumpus 후보조차 아닌 순수 미개척지 공격적 진입
+     * 4순위: Pit 후보 (인접) → 안전지대 소진 시 Pit 후보 칸 모험 진입
+     * 최후의 보루: 완전 고립 시 Safe 방문 칸으로 후퇴
      * Pit 확정 / Wumpus 확정 셀은 탐색 대상에서 영구 제외
      */
-    public Position selectNextCell(String sessionId, Position current) {
+    public Position selectNextCell(String sessionId, Position current, Position previous) {
         KnowledgeBase kb = knowledgeUpdateService.getKnowledgeBaseOrNull(sessionId);
         if (kb == null) return null;
 
         List<Position> neighbors = getNeighbors(current);
 
-        // 1순위: Safe && 미방문
+        Position result;
+
+        result = findFirstPriority(neighbors, kb);
+        if (result != null) return result;
+
+        result = findSecondPriority(kb, current);
+        if (result != null) return result;
+
+        result = findThirdPriority(neighbors, kb);
+        if (result != null) return result;
+
+        result = findFourthPriority(neighbors, kb);
+        if (result != null) return result;
+
+        return findFallback(neighbors, kb, previous, current);
+    }
+
+    /**
+     * 1순위: 인접 Safe 미방문
+     * 안전하게 새로운 칸 탐색
+     */
+    private Position findFirstPriority(List<Position> neighbors, KnowledgeBase kb) {
         for (Position pos : neighbors) {
             if (isValid(pos) && kb.isSafe(pos) && !kb.isVisited(pos)) {
+                System.out.println("[PathFinder] 1순위: 안전한 미방문 칸 이동 -> " + pos);
                 return pos;
             }
         }
+        return null;
+    }
 
-        // 2순위: Safe && 방문함 (backtrack)
+    /**
+     * 2순위: BFS로 가장 가까운 Safe 미방문 칸 탐색 (핑퐁 원천 차단)
+     */
+    private Position findSecondPriority(KnowledgeBase kb, Position current) {
+        Position bfsNext = bfsFindNearestUnvisitedSafe(kb, current);
+        if (bfsNext != null) {
+            System.out.println("[PathFinder] 2순위 BFS: 가장 가까운 Safe 미방문 칸 탐색 → 다음 이동 칸 " + bfsNext);
+        }
+        return bfsNext;
+    }
+
+    /**
+     * 3순위: Unknown 공격적 진입 (확정 위험이 없는 순수 미개척지)
+     * 확정 위험지역 절대 금지, Pit 후보조차 아닌 완전 청정 Unknown
+     */
+    private Position findThirdPriority(List<Position> neighbors, KnowledgeBase kb) {
         for (Position pos : neighbors) {
-            if (isValid(pos) && kb.isSafe(pos) && kb.isVisited(pos)) {
-                boolean hasUnexplored = getNeighbors(pos).stream()
-                        .anyMatch(n -> isValid(n) && kb.isSafe(n) && !kb.isVisited(n));
-                if (hasUnexplored) {
-                    System.out.println("[PathFinder] 2순위 선택 (미탐색 인접 있는 방문 칸): " + pos);
+            if (isValid(pos) && !kb.isVisited(pos)
+                    && !kb.isDefinitePit(pos) && !kb.isDefiniteWumpus(pos)
+                    && !kb.isPossiblePit(pos)) {
+                System.out.println("[PathFinder] 3순위: Unknown 공격적 진입 -> " + pos);
+                return pos;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 4순위: Pit 후보 진입 (안전지대가 아예 없고, 3순위 청정 Unknown도 없을 때만)
+     */
+    private Position findFourthPriority(List<Position> neighbors, KnowledgeBase kb) {
+        for (Position pos : neighbors) {
+            if (isValid(pos) && !kb.isVisited(pos)
+                    && !kb.isDefinitePit(pos) && !kb.isDefiniteWumpus(pos)) {
+                System.out.println("[PathFinder] 4순위: Pit 후보 모험 진입 -> " + pos);
+                return pos;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 최후의 보루: 안전한 칸으로 후퇴하되, 바로 직전 칸(previous)으로 되돌아가며
+     * 핑퐁 치는 것을 원천 차단
+     */
+    private Position findFallback(List<Position> neighbors, KnowledgeBase kb, Position previous, Position current) {
+        Position backup = null;
+        for (Position pos : neighbors) {
+            if (isValid(pos) && kb.isSafe(pos)) {
+                if (previous == null || !pos.equals(previous)) {
+                    System.out.println("[PathFinder] 고립 발생! 다른 안전한 칸으로 후퇴 -> " + pos);
                     return pos;
                 }
+                backup = pos;
             }
         }
 
-        // 3순위: Pit 후보 >= 2개인 셀 (공격적 진입)
-        for (Position pos : neighbors) {
-            if (isValid(pos) && !kb.isDefinitePit(pos) && !kb.isDefiniteWumpus(pos)
-                    && kb.isPossiblePit(pos)) {
-                return pos;
-            }
+        if (backup != null) {
+            System.out.println("[PathFinder] 완전히 막힘! 어쩔 수 없이 직전 칸으로 후퇴 -> " + backup);
+            return backup;
         }
 
-        // 4순위: Unknown (공격적 진입)
-        // Reasoning에서 safe 처리가 안 된 미지의 칸으로 진입
-        // 현재 로직상 거의 발생하지 않으나, Safe 칸이 완전히 소진된 경우 대비
-        for (Position pos : neighbors) {
-            if (isValid(pos) && !kb.isDefinitePit(pos) && !kb.isDefiniteWumpus(pos)) {
-                return pos;
-            }
-        }
-
+        System.out.println("[PathFinder] 완전히 고립됨. 탈출 불가능. 위치: " + current);
         return null;
     }
 
@@ -131,6 +190,55 @@ public class PathFinderService {
         }
 
         return path;
+    }
+
+    /**
+     * BFS로 현재 위치에서 가장 가까운 Safe 미방문 칸까지의
+     * 첫 번째 이동 칸을 반환한다.
+     * Safe 방문 칸만 경유 가능, Pit/Wumpus 확정 칸 제외
+     */
+    private Position bfsFindNearestUnvisitedSafe(KnowledgeBase kb, Position start) {
+        Queue<Position> queue = new LinkedList<>();
+        Map<Position, Position> parentMap = new HashMap<>();
+        queue.add(start);
+        parentMap.put(start, null);
+
+        while (!queue.isEmpty()) {
+            Position current = queue.poll();
+
+            for (Position next : getNeighbors(current)) {
+                if (!isValid(next) || parentMap.containsKey(next)) continue;
+                if (kb.isDefinitePit(next) || kb.isDefiniteWumpus(next)) continue;
+                //if (!kb.isSafe(next)) continue; // Safe 칸만 경유
+
+                parentMap.put(next, current);
+
+                // 목표 체크 먼저 (Safe 아닌 Unknown도 목표가 될 수 있음)
+                if (!kb.isVisited(next) && !kb.isPossiblePit(next) && !kb.isPossibleWumpus(next)) {
+                    return getFirstStep(parentMap, start, next);
+                }
+
+                // 경유는 Safe 칸만 큐에 추가
+                if (kb.isSafe(next)) {
+                    queue.add(next);
+                }
+
+                //queue.add(next);
+            }
+        }
+        System.out.println("[PathFinder] BFS: 탐색 가능한 미방문 칸 없음. 위치: " + start);
+        return null;
+    }
+
+    /**
+     * parentMap을 역추적하여 start에서 target까지의 첫 번째 이동 칸을 반환한다.
+     */
+    private Position getFirstStep(Map<Position, Position> parentMap, Position start, Position target) {
+        Position current = target;
+        while (!parentMap.get(current).equals(start)) {
+            current = parentMap.get(current);
+        }
+        return current;
     }
 
     /**

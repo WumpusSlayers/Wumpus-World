@@ -10,6 +10,9 @@ import com.wumpusslayers.wumpusworld.reasoning.dto.response.PositionCoordinate;
 import com.wumpusslayers.wumpusworld.reasoning.service.KnowledgeUpdateService;
 import com.wumpusslayers.wumpusworld.reasoning.service.ReasoningService;
 import com.wumpusslayers.wumpusworld.reasoning.service.RuleEngineService;
+import com.wumpusslayers.wumpusworld.agent.service.AgentService;
+import com.wumpusslayers.wumpusworld.agent.service.PathFinderService;
+import com.wumpusslayers.wumpusworld.reasoning.service.KnowledgeUpdateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,10 +36,12 @@ class GameEngineKnowledgePersistenceAfterDeathTest {
     @BeforeEach
     void setUp() {
         PerceptService perceptService = new PerceptService();
-        ActionPlannerService actionPlannerService = new ActionPlannerService(perceptService);
         KnowledgeUpdateService knowledgeUpdateService = new KnowledgeUpdateService();
         reasoningService = new ReasoningService(knowledgeUpdateService, new RuleEngineService());
-        gameEngine = new GameEngine(worldGeneratorService, actionPlannerService, perceptService, reasoningService);
+        PathFinderService pathFinderService = new PathFinderService(knowledgeUpdateService);
+        AgentService agentService = new AgentService(pathFinderService, knowledgeUpdateService);
+        ActionPlannerService actionPlannerService = new ActionPlannerService(perceptService, knowledgeUpdateService, reasoningService);
+        gameEngine = new GameEngine(worldGeneratorService, actionPlannerService, perceptService, reasoningService, pathFinderService, agentService);
     }
 
     @Test

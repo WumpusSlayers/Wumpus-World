@@ -15,8 +15,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.wumpusslayers.wumpusworld.agent.service.PathFinderService;
 import com.wumpusslayers.wumpusworld.environment.domain.Position;
+import com.wumpusslayers.wumpusworld.agent.service.AgentService;
+import com.wumpusslayers.wumpusworld.common.enums.GameStatus;
+import java.util.ArrayList;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
 
 /**
  * 게임 월드와 추론 KB는 동일한 {@code userId} 키로 묶인다(#15).
@@ -31,6 +35,7 @@ public class GameEngine {
     private final PerceptService perceptService;
     private final ReasoningService reasoningService;
     private final PathFinderService pathFinderService;
+    private final AgentService agentService;
 
     // 여러 사용자가 접속할 수 있으므로 메모리에 게임 상태 저장 (Key: 세션ID 또는 유저명)
     private final ConcurrentHashMap<String, World> gameSessions = new ConcurrentHashMap<>();
@@ -42,6 +47,8 @@ public class GameEngine {
     public World startNewGame(String userId) {
         requireUserId(userId);
         reasoningService.resetKnowledgeForNewGame(userId);
+        //이전 세션 데이터 정리
+        agentService.clearSession(userId);
         World world = worldGeneratorService.generateWorld();
         gameSessions.put(userId, world);
 
@@ -52,7 +59,7 @@ public class GameEngine {
         System.out.println("새로운 게임 시작! 유저: " + userId);
         System.out.println(world.toString());
 
-        Position recommended = pathFinderService.selectNextCell(userId, world.getAgentPosition());
+        Position recommended = pathFinderService.selectNextCell(userId, world.getAgentPosition(), null);
         System.out.println("---------- [PathFinder] ----------");
         System.out.println("현재 위치: " + world.getAgentPosition());
         System.out.println("다음 추천 셀: " + recommended);
@@ -87,8 +94,8 @@ public class GameEngine {
         System.out.println(world.toString());
 
         // GO_FORWARD 후 PathFinder 다음 추천 셀 로그
-        if (actionType == ActionType.GO_FORWARD) {
-            Position recommended = pathFinderService.selectNextCell(userId, world.getAgentPosition());
+        if (actionType == ActionType.GO_FORWARD && world.getStatus() == GameStatus.PLAYING) {
+            Position recommended = pathFinderService.selectNextCell(userId, world.getAgentPosition(), null);
             System.out.println("---------- [PathFinder] ----------");
             System.out.println("현재 위치: " + world.getAgentPosition());
             System.out.println("다음 추천 셀: " + recommended);
@@ -96,6 +103,46 @@ public class GameEngine {
         }
 
         return result;
+    }
+
+    /**
+     * AgentService가 결정한 액션을 자동으로 실행한다.
+     */
+    public Action processAutoAction(String userId) {
+        requireUserId(userId);
+        World world = gameSessions.get(userId);
+        if (world == null) {
+            throw new SimulationException("진행 중인 게임이 없습니다.");
+        }
+
+        ActionType nextAction = agentService.decideNextAction(userId, world);
+        System.out.println("[Auto] 결정된 액션: " + nextAction);
+
+        if (nextAction == null) {
+            throw new SimulationException("다음 액션을 결정할 수 없습니다.");
+        }
+
+        return processAction(userId, nextAction);
+    }
+
+    /**
+     * 게임 종료까지 AgentService가 자동으로 실행한다.
+     */
+    public List<Action> runAutoGame(String userId) {
+        List<Action> actions = new ArrayList<>();
+        World world = gameSessions.get(userId);
+
+        while (world != null && (world.getStatus() == GameStatus.PLAYING
+                || world.getStatus() == GameStatus.WIN)) {
+            Action action = processAutoAction(userId);
+            actions.add(action);
+            world = gameSessions.get(userId);
+
+            if (world.getStatus() == GameStatus.ESCAPED ||
+                    world.getStatus() == GameStatus.LOSE_PIT ||
+                    world.getStatus() == GameStatus.LOSE_WUMPUS) break;
+        }
+        return actions;
     }
 
     /** 세션에 연결된 World가 없으면 null을 반환한다. */
