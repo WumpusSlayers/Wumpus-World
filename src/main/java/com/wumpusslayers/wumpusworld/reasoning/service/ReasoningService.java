@@ -6,6 +6,7 @@ import com.wumpusslayers.wumpusworld.environment.domain.Position;
 import com.wumpusslayers.wumpusworld.reasoning.domain.KnowledgeBase;
 import com.wumpusslayers.wumpusworld.reasoning.dto.response.KnowledgeSummaryResponse;
 import com.wumpusslayers.wumpusworld.reasoning.dto.response.PositionCoordinate;
+import com.wumpusslayers.wumpusworld.reasoning.dto.response.KbCellDetail;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -134,6 +135,8 @@ public class ReasoningService {
         }
         List<PositionCoordinate> safe = new ArrayList<>();
         List<PositionCoordinate> visited = new ArrayList<>();
+        List<KbCellDetail> cellDetails = new ArrayList<>();
+        
         for (int x = 1; x <= KnowledgeBase.GRID_SIZE; x++) {
             for (int y = 1; y <= KnowledgeBase.GRID_SIZE; y++) {
                 Position p = new Position(x, y);
@@ -143,9 +146,19 @@ public class ReasoningService {
                 if (kb.isVisited(p)) {
                     visited.add(new PositionCoordinate(x, y));
                 }
+                cellDetails.add(new KbCellDetail(
+                        x,
+                        y,
+                        kb.isVisited(p),
+                        kb.isSafe(p),
+                        kb.isPossiblePit(p),
+                        kb.isDefinitePit(p),
+                        kb.isPossibleWumpus(p),
+                        kb.isDefiniteWumpus(p)
+                ));
             }
         }
-        return new KnowledgeSummaryResponse(safe, visited, kb.isWumpusAlive(), kb.isHeardScream());
+        return new KnowledgeSummaryResponse(safe, visited, kb.isWumpusAlive(), kb.isHeardScream(), cellDetails);
     }
 
     /** sessionId가 null·공백이면 {@link SimulationException}을 던진다. */

@@ -11,6 +11,8 @@ import com.wumpusslayers.wumpusworld.environment.domain.World;
 import com.wumpusslayers.wumpusworld.environment.service.PerceptService;
 import com.wumpusslayers.wumpusworld.environment.service.WorldGeneratorService;
 import com.wumpusslayers.wumpusworld.reasoning.service.ReasoningService;
+import com.wumpusslayers.wumpusworld.reasoning.service.KnowledgeUpdateService;
+import com.wumpusslayers.wumpusworld.reasoning.domain.KnowledgeBase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.wumpusslayers.wumpusworld.agent.service.PathFinderService;
@@ -36,6 +38,7 @@ public class GameEngine {
     private final ReasoningService reasoningService;
     private final PathFinderService pathFinderService;
     private final AgentService agentService;
+    private final KnowledgeUpdateService knowledgeUpdateService;
 
     // 여러 사용자가 접속할 수 있으므로 메모리에 게임 상태 저장 (Key: 세션ID 또는 유저명)
     private final ConcurrentHashMap<String, World> gameSessions = new ConcurrentHashMap<>();
@@ -93,16 +96,23 @@ public class GameEngine {
         System.out.println("액션 실행: " + actionType + " | 결과: " + result.getMessage());
         System.out.println(world.toString());
 
-        // GO_FORWARD 후 PathFinder 다음 추천 셀 로그
-        if (actionType == ActionType.GO_FORWARD && world.getStatus() == GameStatus.PLAYING) {
-            Position recommended = pathFinderService.selectNextCell(userId, world.getAgentPosition(), null);
+        String pathFinderPart = "";
+        if (world.getStatus() == GameStatus.PLAYING) {
+            pathFinderPart = getPathFinderRecommendationMessage(userId, world.getAgentPosition());
             System.out.println("---------- [PathFinder] ----------");
             System.out.println("현재 위치: " + world.getAgentPosition());
-            System.out.println("다음 추천 셀: " + recommended);
+            System.out.println("추천 셀 로그: " + pathFinderPart);
             System.out.println("----------------------------------");
         }
 
-        return result;
+        return Action.builder()
+                .percept(result.getPercept())
+                .isGameOver(result.isGameOver())
+                .message(result.getMessage() + pathFinderPart)
+                .actionPosition(result.getActionPosition())
+                .diedInPit(result.isDiedInPit())
+                .diedInWumpus(result.isDiedInWumpus())
+                .build();
     }
 
     /**
@@ -122,7 +132,40 @@ public class GameEngine {
             throw new SimulationException("다음 액션을 결정할 수 없습니다.");
         }
 
-        return processAction(userId, nextAction);
+        Action result = processAction(userId, nextAction);
+
+        String autoPrefix = "[Auto] 결정된 액션: " + nextAction + " | ";
+        return Action.builder()
+                .percept(result.getPercept())
+                .isGameOver(result.isGameOver())
+                .message(autoPrefix + result.getMessage())
+                .actionPosition(result.getActionPosition())
+                .diedInPit(result.isDiedInPit())
+                .diedInWumpus(result.isDiedInWumpus())
+                .build();
+    }
+
+    private String getPathFinderRecommendationMessage(String userId, Position agentPos) {
+        Position recommended = pathFinderService.selectNextCell(userId, agentPos, null);
+        if (recommended == null) {
+            return " | [PathFinder] 탈출 불가능 [고립 발생]";
+        }
+        KnowledgeBase knowledgeBase = knowledgeUpdateService.getKnowledgeBaseOrNull(userId);
+        if (knowledgeBase != null) {
+            if (knowledgeBase.isSafe(recommended) && !knowledgeBase.isVisited(recommended)) {
+                return " | [PathFinder] 다음 추천 셀: Position(x=" + recommended.getX() + ", y=" + recommended.getY() + ") [1순위: 안전한 미방문 칸]";
+            }
+            if (knowledgeBase.isSafe(recommended) && knowledgeBase.isVisited(recommended)) {
+                return " | [PathFinder] 다음 추천 셀: Position(x=" + recommended.getX() + ", y=" + recommended.getY() + ") [2순위: 가장 가까운 Safe 미방문 칸으로 BFS 복귀]";
+            }
+            if (!knowledgeBase.isVisited(recommended) && !knowledgeBase.isPossiblePit(recommended) && !knowledgeBase.isPossibleWumpus(recommended)) {
+                return " | [PathFinder] 다음 추천 셀: Position(x=" + recommended.getX() + ", y=" + recommended.getY() + ") [3순위 모험: 미지의 미방문 칸]";
+            }
+            if (!knowledgeBase.isVisited(recommended) && (knowledgeBase.isPossiblePit(recommended) || knowledgeBase.isPossibleWumpus(recommended))) {
+                return " | [PathFinder] 다음 추천 셀: Position(x=" + recommended.getX() + ", y=" + recommended.getY() + ") [4순위 모험: Pit/Wumpus 후보 진입]";
+            }
+        }
+        return " | [PathFinder] 다음 추천 셀: Position(x=" + recommended.getX() + ", y=" + recommended.getY() + ")";
     }
 
     /**

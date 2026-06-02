@@ -41,7 +41,7 @@ class GameEngineKnowledgePersistenceAfterDeathTest {
         PathFinderService pathFinderService = new PathFinderService(knowledgeUpdateService);
         AgentService agentService = new AgentService(pathFinderService, knowledgeUpdateService);
         ActionPlannerService actionPlannerService = new ActionPlannerService(perceptService, knowledgeUpdateService, reasoningService);
-        gameEngine = new GameEngine(worldGeneratorService, actionPlannerService, perceptService, reasoningService, pathFinderService, agentService);
+        gameEngine = new GameEngine(worldGeneratorService, actionPlannerService, perceptService, reasoningService, pathFinderService, agentService, knowledgeUpdateService);
     }
 
     @Test

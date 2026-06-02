@@ -44,7 +44,8 @@ class GameControllerReasoningWebMvcTest {
                 List.of(new PositionCoordinate(1, 1)),
                 List.of(new PositionCoordinate(1, 1)),
                 true,
-                false
+                false,
+                List.of()
         ));
 
         mockMvc.perform(get("/api/game/reasoning/summary").param("userId", "tester"))

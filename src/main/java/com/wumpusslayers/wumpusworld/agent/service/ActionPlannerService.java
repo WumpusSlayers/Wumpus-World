@@ -119,8 +119,8 @@ public class ActionPlannerService {
                 screamed = shootArrow(world, sessionId, kb);
                 System.out.println("남은 화살 수: " + world.getArrowCount());
                 message = screamed
-                        ? "화살이 Wumpus에 명중했습니다!"
-                        : "화살이 빗나갔습니다.";
+                        ? "🏹 화살을 발사했습니다! | 😱 [SCREAM] 저 멀리서 고막을 찢는 웜파스의 단말마 비명소리가 들려옵니다! 웜파스 퇴치 성공!"
+                        : "🏹 화살을 발사했습니다! | 아무 일도 일어나지 않았습니다. 화살이 허공을 갈랐습니다.";
             }
         }
 
@@ -130,6 +130,11 @@ public class ActionPlannerService {
         // 3. 행동 후 생존 여부 확인 (구덩이나 움퍼스면 여기서 1,1로 리셋됨)
         if (actionType == ActionType.GO_FORWARD) {
             death = checkSurvival(world);
+            if (death == DeathCause.PIT) {
+                message = "⚠️ [EVENT] 구덩이에 빠졌습니다! 에이전트가 사망 후 (1,1)에서 리스폰됩니다.";
+            } else if (death == DeathCause.WUMPUS) {
+                message = "⚠️ [EVENT] 웜파스에게 잡아먹혔습니다! 에이전트가 사망 후 (1,1)에서 리스폰됩니다.";
+            }
         }
 
         boolean isGameOver = world.getStatus() != GameStatus.PLAYING && world.getStatus() != GameStatus.WIN;

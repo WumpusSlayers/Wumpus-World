@@ -9,10 +9,11 @@ public record KnowledgeSummaryResponse(
         List<PositionCoordinate> safeCells,
         List<PositionCoordinate> visitedCells,
         boolean wumpusAlive,
-        boolean heardScream
+        boolean heardScream,
+        List<KbCellDetail> cellDetails
 ) {
     /** 세션에 KB가 없을 때 사용한다. */
     public static KnowledgeSummaryResponse empty() {
-        return new KnowledgeSummaryResponse(List.of(), List.of(), true, false);
+        return new KnowledgeSummaryResponse(List.of(), List.of(), true, false, List.of());
     }
 }
