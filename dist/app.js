@@ -495,6 +495,19 @@ function toggleAutoPlay() {
   }
 }
 
+function runAutoPlayInterval() {
+  if (state.autoPlayIntervalId) {
+    clearInterval(state.autoPlayIntervalId);
+  }
+  state.autoPlayIntervalId = setInterval(() => {
+    if (state.board && (state.board.status === 'PLAYING' || state.board.status === 'WIN')) {
+      executeAutoStep();
+    } else {
+      stopAutoPlay();
+    }
+  }, 1200);
+}
+
 function startAutoPlay() {
   state.isAutoPlaying = true;
   DOM.btnAutoPlay.textContent = '자동 실행 일시정지 ⏸️';
@@ -505,14 +518,7 @@ function startAutoPlay() {
   // Run first action immediately
   executeAutoStep();
   
-  // Set up slow interval (1.2s)
-  state.autoPlayIntervalId = setInterval(() => {
-    if (state.board && (state.board.status === 'PLAYING' || state.board.status === 'WIN')) {
-      executeAutoStep();
-    } else {
-      stopAutoPlay();
-    }
-  }, 1200);
+  runAutoPlayInterval();
 }
 
 function stopAutoPlay() {
@@ -593,9 +599,23 @@ function showEventModal(title, text, icon = '🏹') {
   modalText.textContent = text;
   modalIcon.textContent = icon;
   
+  // Pause auto play interval if active for event alert
+  if (state.isAutoPlaying && state.autoPlayIntervalId) {
+    clearInterval(state.autoPlayIntervalId);
+    state.autoPlayIntervalId = null;
+    addLog('SYSTEM', '⏸️ 이벤트 알림 확인을 위해 자동 실행 루프가 일시 정지되었습니다.', 'system');
+  }
+  
   modal.style.display = 'flex';
 }
 
 document.getElementById('btn-modal-close').addEventListener('click', () => {
   document.getElementById('event-modal').style.display = 'none';
+  
+  // Resume auto play interval if it was active
+  if (state.isAutoPlaying) {
+    addLog('SYSTEM', '▶️ 알림 확인 완료 - 자동 실행 루프를 재개합니다.', 'system');
+    executeAutoStep();
+    runAutoPlayInterval();
+  }
 });
