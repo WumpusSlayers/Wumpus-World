@@ -425,9 +425,6 @@ async function executeAction(actionType) {
   if (!state.isPlaying) return;
   stopAutoPlay();
   
-  // Cache the direction before the shot takes place
-  const dirBeforeShoot = state.board ? state.board.agentDirection : 'EAST';
-  
   try {
     const actionRes = await api.post(`/action?userId=${encodeURIComponent(state.userId)}&type=${actionType}`);
     processActionLog(actionRes.data);
@@ -437,9 +434,10 @@ async function executeAction(actionType) {
     // Shoot Modal Alert Trigger
     if (actionType === 'SHOOT') {
       const isHit = actionRes.data.message.includes('[SCREAM]');
+      const actualShootDir = state.board ? state.board.agentDirection : 'EAST';
       const detailsText = isHit
-        ? `🤠 에이전트가 ${dirBeforeShoot} 방향으로 화살을 발사하여 웜파스 괴물의 심장을 명중시켰습니다! 👾 ➡️ 💀`
-        : `🤠 에이전트가 ${dirBeforeShoot} 방향으로 화살을 발사했으나, 아무 일도 일어나지 않았습니다. 🏹💨`;
+        ? `🤠 에이전트가 ${actualShootDir} 방향으로 화살을 발사하여 웜파스 괴물의 심장을 명중시켰습니다! 👾 ➡️ 💀`
+        : `🤠 에이전트가 ${actualShootDir} 방향으로 화살을 발사했으나, 아무 일도 일어나지 않았습니다. 🏹💨`;
       showEventModal(isHit ? "사격 명중! 🎯" : "화살 발사! 🏹", detailsText, isHit ? "🎯" : "🏹");
     }
     
@@ -456,8 +454,6 @@ async function executeAction(actionType) {
 async function executeAutoStep() {
   if (!state.isPlaying) return;
   
-  const dirBeforeShoot = state.board ? state.board.agentDirection : 'EAST';
-  
   try {
     const autoRes = await api.post(`/auto?userId=${encodeURIComponent(state.userId)}`);
     processActionLog(autoRes.data);
@@ -467,9 +463,10 @@ async function executeAutoStep() {
     // Shoot Modal Alert Trigger for Auto Play
     if (autoRes.data.message.includes('결정된 액션: SHOOT')) {
       const isHit = autoRes.data.message.includes('[SCREAM]');
+      const actualShootDir = state.board ? state.board.agentDirection : 'EAST';
       const detailsText = isHit
-        ? `🤖 에이전트가 자동 판단에 의해 ${dirBeforeShoot} 방향으로 화살을 발사하여 웜파스 괴물을 소탕했습니다! 👾 ➡️ 💀`
-        : `🤖 에이전트가 자동 판단에 의해 ${dirBeforeShoot} 방향으로 화살을 발사했으나, 빗나갔습니다. 🏹💨`;
+        ? `🤖 에이전트가 자동 판단에 의해 ${actualShootDir} 방향으로 화살을 발사하여 웜파스 괴물을 소탕했습니다! 👾 ➡️ 💀`
+        : `🤖 에이전트가 자동 판단에 의해 ${actualShootDir} 방향으로 화살을 발사했으나, 빗나갔습니다. 🏹💨`;
       showEventModal(isHit ? "자동 사격 명중! 🤖🎯" : "자동 화살 발사! 🤖🏹", detailsText, isHit ? "🎯" : "🏹");
     }
     
