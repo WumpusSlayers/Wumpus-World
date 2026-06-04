@@ -35,8 +35,8 @@ public class KnowledgeUpdateService {
                 .computeIfAbsent(sessionId, id -> new KnowledgeBase())
                 .recordCellObservation(position, percept);
 
-        // 테스트용 로그 출력
-        System.out.println("📝 [KB 업데이트] 좌표: " + position + " | 관측: " + percept);
+        // 테스트용 로그 출력 (관측 정보는 Cyan 색상으로 강조 출력)
+        System.out.println("📝 [KB 업데이트] 좌표: " + position + " | 관측: \u001B[36m" + percept + "\u001B[0m");
     }
 
     /**
